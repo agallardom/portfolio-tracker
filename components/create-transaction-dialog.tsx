@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { createTransaction, updateTransaction } from "@/actions/transaction";
 import { Plus, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { AssetSearch } from "./asset-search";
 
 type Transaction = {
     id: string;
@@ -16,6 +17,9 @@ type Transaction = {
     pricePerUnit?: number | null;
     quantity?: number | null;
     fee?: number | null;
+    exchangeRate?: number | null;
+    originalCurrency?: string | null;
+    originalAmount?: number | null;
     portfolioId: string;
 };
 
@@ -43,6 +47,9 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
         pricePerUnit: "",
         quantity: "",
         fee: "",
+        sourceCurrency: currency, // Default to same as portfolio
+        sourceAmount: "",
+        exchangeRate: "1.0",
     });
 
     useEffect(() => {
@@ -60,6 +67,9 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 pricePerUnit: transaction.pricePerUnit?.toString() || "",
                 quantity: transaction.quantity?.toString() || "",
                 fee: transaction.fee?.toString() || "",
+                sourceCurrency: transaction.currency, // Defaulting to simple case for now
+                sourceAmount: transaction.amount.toString(),
+                exchangeRate: transaction.exchangeRate?.toString() || "1.0",
             });
         } else if (!transaction && isOpen) {
             // Reset form for create mode
@@ -72,13 +82,43 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 pricePerUnit: "",
                 quantity: "",
                 fee: "",
+                sourceCurrency: currency, // Default to same as portfolio
+                sourceAmount: "",
+                exchangeRate: "1.0",
             });
         }
     }, [transaction, isOpen, currency]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+
+        setFormData(prev => {
+            const newData = { ...prev, [name]: value };
+
+            // 1. Currency Conversion Calculation
+            if (name === 'sourceAmount' || name === 'exchangeRate') {
+                const sAmount = parseFloat(newData.sourceAmount);
+                const rate = parseFloat(newData.exchangeRate);
+                if (!isNaN(sAmount) && !isNaN(rate)) {
+                    // source * rate = target
+                    newData.amount = (sAmount * rate).toFixed(2);
+                }
+            }
+
+            // 2. Quantity Calculation
+            // Auto-calculate quantity if pricePerUnit or amount changes
+            if (name === 'pricePerUnit' || name === 'amount' || name === 'sourceAmount' || name === 'exchangeRate') {
+                // Check if amount changed due to conversion above
+                const amount = parseFloat(newData.amount);
+                const price = parseFloat(newData.pricePerUnit);
+
+                if (!isNaN(amount) && !isNaN(price) && price !== 0) {
+                    newData.quantity = parseFloat((amount / price).toFixed(8)).toString();
+                }
+            }
+
+            return newData;
+        });
     };
 
     async function handleSubmit(e: React.FormEvent) {
@@ -95,6 +135,9 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 pricePerUnit: formData.pricePerUnit ? parseFloat(formData.pricePerUnit) : undefined,
                 quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
                 fee: formData.fee ? parseFloat(formData.fee) : undefined,
+                exchangeRate: parseFloat(formData.exchangeRate) || 1.0,
+                originalCurrency: formData.sourceCurrency,
+                originalAmount: formData.sourceAmount ? parseFloat(formData.sourceAmount) : undefined,
                 portfolioId,
             };
 
@@ -115,6 +158,9 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                     pricePerUnit: "",
                     quantity: "",
                     fee: "",
+                    sourceCurrency: currency,
+                    sourceAmount: "",
+                    exchangeRate: "1.0",
                 });
             }
             router.refresh();
@@ -152,6 +198,9 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                             >
                                 <option value="BUY">Buy</option>
                                 <option value="SELL">Sell</option>
+                                <option value="DEPOSIT">Deposit</option>
+                                <option value="WITHDRAWAL">Withdrawal</option>
+                                <option value="GIFT">Gift</option>
                                 <option value="DIVIDEND">Dividend</option>
                                 <option value="SAVEBACK">SaveBack</option>
                                 <option value="ROUNDUP">RoundUp</option>
@@ -159,21 +208,19 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-muted-foreground">Asset Symbol</label>
-                        <input
-                            type="text"
-                            name="assetSymbol"
-                            value={formData.assetSymbol}
-                            onChange={handleChange}
-                            placeholder="e.g. AAPL, BTC, S&P500"
-                            className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        />
-                    </div>
+                    {['BUY', 'SELL', 'DIVIDEND', 'SAVEBACK', 'ROUNDUP'].includes(formData.type) && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Asset Symbol</label>
+                            <AssetSearch
+                                initialValue={formData.assetSymbol}
+                                onSelect={(symbol) => setFormData(prev => ({ ...prev, assetSymbol: symbol }))}
+                            />
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Total Amount ({formData.currency})</label>
+                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Amount ({formData.currency})</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -199,32 +246,34 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Quantity</label>
-                            <input
-                                type="number"
-                                step="any"
-                                name="quantity"
-                                value={formData.quantity}
-                                onChange={handleChange}
-                                placeholder="0"
-                                className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
+                    {['BUY', 'SELL', 'SAVEBACK', 'ROUNDUP'].includes(formData.type) && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Quantity</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    name="quantity"
+                                    value={formData.quantity}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Price Per Unit</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    name="pricePerUnit"
+                                    value={formData.pricePerUnit}
+                                    onChange={handleChange}
+                                    placeholder="0.00"
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Price Per Unit</label>
-                            <input
-                                type="number"
-                                step="any"
-                                name="pricePerUnit"
-                                value={formData.pricePerUnit}
-                                onChange={handleChange}
-                                placeholder="0.00"
-                                className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
-                        </div>
-                    </div>
+                    )}
 
                     <div className="flex justify-end gap-2 mt-6">
                         <button

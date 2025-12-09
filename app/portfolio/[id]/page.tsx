@@ -6,6 +6,8 @@ import { Plus } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
 import { getPortfolioSummary, getPortfolioHistory } from "@/actions/portfolio";
 import { PortfolioChart } from "@/components/portfolio-chart";
+import { RefreshPricesButton } from "@/components/refresh-prices-button";
+import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 
 export default async function PortfolioPage({ params }: { params: { id: string } }) {
     const { id } = await params; // Next.js 15+ params are async
@@ -34,7 +36,10 @@ export default async function PortfolioPage({ params }: { params: { id: string }
                             {portfolio.currency} Portfolio • {transactions?.length || 0} Transactions
                         </p>
                     </div>
-                    <CreateTransactionDialog portfolioId={portfolio.id} currency={portfolio.currency} />
+                    <div className="flex gap-2">
+                        <RefreshPricesButton portfolioId={portfolio.id} />
+                        <CreateTransactionDialog portfolioId={portfolio.id} currency={portfolio.currency} />
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -73,16 +78,19 @@ export default async function PortfolioPage({ params }: { params: { id: string }
                                                     {tx.amount.toFixed(2)} {tx.currency}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <CreateTransactionDialog
-                                                        portfolioId={portfolio.id}
-                                                        currency={portfolio.currency}
-                                                        transaction={tx}
-                                                        trigger={
-                                                            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-foreground">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                                            </button>
-                                                        }
-                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <CreateTransactionDialog
+                                                            portfolioId={portfolio.id}
+                                                            currency={portfolio.currency}
+                                                            transaction={tx}
+                                                            trigger={
+                                                                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-foreground">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                                </button>
+                                                            }
+                                                        />
+                                                        <DeleteTransactionButton transactionId={tx.id} />
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -100,26 +108,53 @@ export default async function PortfolioPage({ params }: { params: { id: string }
                     </div>
 
                     {/* Sidebar (Holdings & Summary) */}
-                    <div className="space-y-6">
-                        <div className="glass-card p-6 rounded-2xl">
-                            <h3 className="text-sm font-medium text-muted-foreground mb-4">Portfolio Summary</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground">Total Invested</span>
-                                    <span className="font-mono">{summary?.totalInvested.toFixed(2) ?? "0.00"} {portfolio.currency}</span>
+                    <div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div className="bg-card glass-card p-4 rounded-xl">
+                                <div className="text-sm text-muted-foreground mb-1">Total Value</div>
+                                <div className="text-2xl font-bold font-mono">
+                                    {summary?.currentValue.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground">Current Value</span>
-                                    <span className="font-mono font-bold">{summary?.currentValue.toFixed(2) ?? "0.00"} {portfolio.currency}</span>
+                            </div>
+                            <div className="bg-card glass-card p-4 rounded-xl">
+                                <div className="text-sm text-muted-foreground mb-1">Net Invested</div>
+                                <div className="text-2xl font-bold font-mono">
+                                    {summary?.totalInvested.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
                                 </div>
-                                <div className={`pt-4 border-t border-white/10 flex justify-between items-center ${(summary?.unrealizedPL ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                    <span>P/L</span>
-                                    <span className="font-mono">
-                                        {(summary?.unrealizedPL ?? 0) >= 0 ? "+" : ""}{(summary?.unrealizedPL ?? 0).toFixed(2)} ({(summary?.roi ?? 0).toFixed(2)}%)
-                                    </span>
+                            </div>
+                            <div className="bg-card glass-card p-4 rounded-xl">
+                                <div className="text-sm text-muted-foreground mb-1">Total Gain</div>
+                                <div className={`text-2xl font-bold font-mono ${summary?.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {summary?.totalGain >= 0 ? '+' : ''}{summary?.totalGain.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
+                                </div>
+                                <div className={`text-sm ${summary?.totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {summary?.totalGainPercent.toFixed(2)}% ROI
+                                </div>
+                            </div>
+                            <div className="bg-card glass-card p-4 rounded-xl border-primary/20 bg-primary/5">
+                                <div className="text-sm text-primary mb-1 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>
+                                    Cash Available
+                                </div>
+                                <div className="text-2xl font-bold font-mono text-primary">
+                                    {summary?.cashBalance.toFixed(2)} <span className="text-sm text-primary/70">{portfolio?.currency}</span>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Breakdown by Source Currency */}
+                        {(summary?.totalInvestedEUR ? summary.totalInvestedEUR > 0 : false) || (summary?.totalInvestedUSD ? summary.totalInvestedUSD > 0 : false) ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-secondary/20 p-3 rounded-lg flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">Invested (EUR Source)</span>
+                                    <span className="font-mono">{summary?.totalInvestedEUR?.toFixed(2) || '0.00'} €</span>
+                                </div>
+                                <div className="bg-secondary/20 p-3 rounded-lg flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">Invested (USD Source)</span>
+                                    <span className="font-mono">{summary?.totalInvestedUSD?.toFixed(2) || '0.00'} $</span>
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             </main>

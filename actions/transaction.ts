@@ -13,6 +13,8 @@ export type TransactionData = {
     quantity?: number;
     fee?: number;
     exchangeRate?: number;
+    originalCurrency?: string;
+    originalAmount?: number;
     portfolioId: string;
 };
 
@@ -38,6 +40,8 @@ export async function createTransaction(data: TransactionData) {
                 quantity: data.quantity,
                 fee: data.fee,
                 exchangeRate: data.exchangeRate,
+                originalCurrency: data.originalCurrency,
+                originalAmount: data.originalAmount,
                 portfolioId: data.portfolioId,
             },
         });
@@ -73,10 +77,11 @@ export async function updateTransaction(id: string, data: TransactionData) {
                 quantity: data.quantity,
                 fee: data.fee,
                 exchangeRate: data.exchangeRate,
+                originalCurrency: data.originalCurrency,
+                originalAmount: data.originalAmount,
+                portfolioId: data.portfolioId,
             },
-        });
-
-        revalidatePath("/");
+        }); revalidatePath("/");
         revalidatePath("/portfolio/[id]");
         return { success: true, data: transaction };
     } catch (error) {
@@ -95,5 +100,20 @@ export async function getTransactions(portfolioId: string) {
         return { success: true, data: transactions };
     } catch (error) {
         return { success: false, error: "Failed to fetch transactions" };
+    }
+}
+
+export async function deleteTransaction(id: string) {
+    try {
+        await prisma.transaction.delete({
+            where: { id }
+        });
+
+        revalidatePath("/");
+        revalidatePath("/portfolio/[id]");
+        return { success: true };
+    } catch (error) {
+        console.error("Delete transaction error:", error);
+        return { success: false, error: "Failed to delete transaction" };
     }
 }

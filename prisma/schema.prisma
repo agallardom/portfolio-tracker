@@ -44,6 +44,10 @@ model Transaction {
   
   // Exchange rate to base currency (e.g. EUR) for reporting
   exchangeRate Float?   @default(1.0) 
+  
+  // Historical data for multi-currency
+  originalCurrency String?
+  originalAmount   Float? 
 
   portfolioId  String
   portfolio    Portfolio @relation(fields: [portfolioId], references: [id])
