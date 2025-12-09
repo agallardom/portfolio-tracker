@@ -95,13 +95,23 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
         setFormData(prev => {
             const newData = { ...prev, [name]: value };
 
-            // 1. Currency Conversion Calculation
+            // 1. Currency Conversion Calculation (Bidirectional)
+            // If Source Amount or Rate changes -> Calculate Target Amount
             if (name === 'sourceAmount' || name === 'exchangeRate') {
                 const sAmount = parseFloat(newData.sourceAmount);
                 const rate = parseFloat(newData.exchangeRate);
                 if (!isNaN(sAmount) && !isNaN(rate)) {
                     // source * rate = target
                     newData.amount = (sAmount * rate).toFixed(2);
+                }
+            }
+
+            // If Target Amount changes -> Calculate Rate (if Source Amount exists)
+            if (name === 'amount') {
+                const tAmount = parseFloat(newData.amount);
+                const sAmount = parseFloat(newData.sourceAmount);
+                if (!isNaN(tAmount) && !isNaN(sAmount) && sAmount !== 0 && newData.sourceCurrency !== newData.currency) {
+                    newData.exchangeRate = (tAmount / sAmount).toFixed(4);
                 }
             }
 
@@ -112,7 +122,8 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 const amount = parseFloat(newData.amount);
                 const price = parseFloat(newData.pricePerUnit);
 
-                if (!isNaN(amount) && !isNaN(price) && price !== 0) {
+                // Quantity only matters for asset transactions
+                if (['BUY', 'SELL'].includes(newData.type) && !isNaN(amount) && !isNaN(price) && price !== 0) {
                     newData.quantity = parseFloat((amount / price).toFixed(8)).toString();
                 }
             }
@@ -218,6 +229,51 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                         </div>
                     )}
 
+                    {/* Currency Conversion Section - Show first for clarity if relevant */}
+                    <div className="bg-secondary/20 p-4 rounded-lg space-y-4 border border-white/5">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Original Currency</label>
+                                <select
+                                    name="sourceCurrency"
+                                    value={formData.sourceCurrency}
+                                    onChange={handleChange}
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                >
+                                    <option value="USD">USD ($)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Original Amount</label>
+                                <input
+                                    type="number"
+                                    name="sourceAmount"
+                                    value={formData.sourceAmount}
+                                    onChange={handleChange}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
+                        </div>
+
+                        {formData.sourceCurrency !== formData.currency && (
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Exchange Rate (1 {formData.sourceCurrency} = ? {formData.currency})</label>
+                                <input
+                                    type="number"
+                                    name="exchangeRate"
+                                    value={formData.exchangeRate}
+                                    onChange={handleChange}
+                                    placeholder="Auto-calculated if you enter both amounts"
+                                    step="0.0001"
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
+                        )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium mb-1 text-muted-foreground">Amount ({formData.currency})</label>
@@ -232,18 +288,20 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                                 className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Fee ({formData.currency})</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                name="fee"
-                                value={formData.fee}
-                                onChange={handleChange}
-                                placeholder="0.00"
-                                className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
-                        </div>
+                        {['BUY', 'SELL'].includes(formData.type) && (
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Fee ({formData.currency})</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="fee"
+                                    value={formData.fee}
+                                    onChange={handleChange}
+                                    placeholder="0.00"
+                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {['BUY', 'SELL', 'SAVEBACK', 'ROUNDUP'].includes(formData.type) && (
