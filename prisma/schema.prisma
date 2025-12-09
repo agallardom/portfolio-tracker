@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Portfolio {
+  id           String        @id @default(uuid())
+  name         String
+  currency     String        // "USD" or "EUR"
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Asset {
+  symbol       String        @id
+  name         String?
+  currentPrice Float?
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id           String   @id @default(uuid())
+  date         DateTime
+  type         String   // "BUY", "SELL", "DIVIDEND", "SAVEBACK", "ROUNDUP"
+  
+  // Amounts
+  amount       Float    // Total value in local currency (e.g. $100)
+  currency     String   // Currency of the transaction (should match Portfolio currency usually)
+  
+  // Asset info (optional for SaveBack etc)
+  assetSymbol  String?
+  asset        Asset?   @relation(fields: [assetSymbol], references: [symbol])
+  
+  pricePerUnit Float?
+  quantity     Float?
+  
+  fee          Float?   @default(0)
+  
+  // Exchange rate to base currency (e.g. EUR) for reporting
+  exchangeRate Float?   @default(1.0) 
+
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
