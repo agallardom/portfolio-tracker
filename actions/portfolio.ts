@@ -57,6 +57,15 @@ export async function getPortfolioSummary(portfolioId: string) {
         const holdings = new Map<string, number>();
         const prices = new Map<string, number>();
 
+        // Helper to track original currency investment
+        // If originalCurrency doesn't exist (legacy), we assume it matched the portfolio currency (e.g. USD if portfolio is USD)
+        // Or we just skip it.
+        const addToInvestedCurrency = (amount: number, currency?: string | null) => {
+            const curr = currency || portfolio.currency;
+            if (curr === 'EUR') totalInvestedEUR += amount;
+            if (curr === 'USD') totalInvestedUSD += amount;
+        };
+
         for (const tx of transactions) {
             // Update prices map if available
             if (tx.asset && tx.asset.currentPrice) {
@@ -64,15 +73,6 @@ export async function getPortfolioSummary(portfolioId: string) {
             }
 
             const totalCost = tx.amount + (tx.fee || 0);
-
-            // Helper to track original currency investment
-            // If originalCurrency doesn't exist (legacy), we assume it matched the portfolio currency (e.g. USD if portfolio is USD)
-            // Or we just skip it.
-            const addToInvestedCurrency = (amount: number, currency?: string | null) => {
-                const curr = currency || portfolio.currency;
-                if (curr === 'EUR') totalInvestedEUR += amount;
-                if (curr === 'USD') totalInvestedUSD += amount;
-            }
 
             switch (tx.type) {
                 case "DEPOSIT":

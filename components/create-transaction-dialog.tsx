@@ -120,11 +120,11 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
             if (name === 'pricePerUnit' || name === 'amount' || name === 'sourceAmount' || name === 'exchangeRate') {
                 // Check if amount changed due to conversion above
                 const amount = parseFloat(newData.amount);
-                const price = parseFloat(newData.pricePerUnit);
+                const quantity = parseFloat(newData.quantity);
 
                 // Quantity only matters for asset transactions
-                if (['BUY', 'SELL'].includes(newData.type) && !isNaN(amount) && !isNaN(price) && price !== 0) {
-                    newData.quantity = parseFloat((amount / price).toFixed(8)).toString();
+                if (['BUY', 'SELL'].includes(newData.type) && !isNaN(amount) && !isNaN(quantity) && quantity !== 0) {
+                    newData.pricePerUnit = parseFloat((amount / quantity).toFixed(8)).toString();
                 }
             }
 
