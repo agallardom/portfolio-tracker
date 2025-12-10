@@ -50,6 +50,8 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
         sourceCurrency: currency, // Default to same as portfolio
         sourceAmount: "",
         exchangeRate: "1.0",
+        assetCurrency: "", // Currency the asset trades in
+        pricePerUnitInAssetCurrency: "", // Price in asset's currency
     });
 
     useEffect(() => {
@@ -67,9 +69,11 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 pricePerUnit: transaction.pricePerUnit?.toString() || "",
                 quantity: transaction.quantity?.toString() || "",
                 fee: transaction.fee?.toString() || "",
-                sourceCurrency: transaction.currency, // Defaulting to simple case for now
-                sourceAmount: transaction.amount.toString(),
+                sourceCurrency: transaction.originalCurrency || transaction.currency,
+                sourceAmount: transaction.originalAmount?.toString() || transaction.amount.toString(),
                 exchangeRate: transaction.exchangeRate?.toString() || "1.0",
+                assetCurrency: (transaction as any).assetCurrency || "",
+                pricePerUnitInAssetCurrency: (transaction as any).pricePerUnitInAssetCurrency?.toString() || "",
             });
         } else if (!transaction && isOpen) {
             // Reset form for create mode
@@ -82,9 +86,11 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 pricePerUnit: "",
                 quantity: "",
                 fee: "",
-                sourceCurrency: currency, // Default to same as portfolio
+                sourceCurrency: currency,
                 sourceAmount: "",
                 exchangeRate: "1.0",
+                assetCurrency: "",
+                pricePerUnitInAssetCurrency: "",
             });
         }
     }, [transaction, isOpen, currency]);
@@ -115,16 +121,26 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 }
             }
 
-            // 2. Quantity Calculation
-            // Auto-calculate quantity if pricePerUnit or amount changes
-            if (name === 'pricePerUnit' || name === 'amount' || name === 'sourceAmount' || name === 'exchangeRate') {
-                // Check if amount changed due to conversion above
+            // 2. Quantity and Price Calculation
+            // Auto-calculate pricePerUnit (in portfolio currency) from amount and quantity
+            if (name === 'quantity' || name === 'amount' || name === 'sourceAmount' || name === 'exchangeRate') {
                 const amount = parseFloat(newData.amount);
                 const quantity = parseFloat(newData.quantity);
 
-                // Quantity only matters for asset transactions
-                if (['BUY', 'SELL'].includes(newData.type) && !isNaN(amount) && !isNaN(quantity) && quantity !== 0) {
+                if (['BUY', 'SELL', 'SAVEBACK', 'ROUNDUP'].includes(newData.type) && !isNaN(amount) && !isNaN(quantity) && quantity !== 0) {
                     newData.pricePerUnit = parseFloat((amount / quantity).toFixed(8)).toString();
+                }
+            }
+
+            // 3. Asset Currency Price Calculation
+            // If user enters price in asset currency, calculate exchange rate from the two prices
+            if (name === 'pricePerUnitInAssetCurrency') {
+                const priceInAsset = parseFloat(newData.pricePerUnitInAssetCurrency);
+                const priceInPortfolio = parseFloat(newData.pricePerUnit);
+
+                if (!isNaN(priceInAsset) && !isNaN(priceInPortfolio) && priceInAsset !== 0 && newData.assetCurrency && newData.assetCurrency !== newData.currency) {
+                    // Calculate exchange rate from prices: portfolio price / asset price
+                    newData.exchangeRate = (priceInPortfolio / priceInAsset).toFixed(4);
                 }
             }
 
@@ -149,6 +165,8 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                 exchangeRate: parseFloat(formData.exchangeRate) || 1.0,
                 originalCurrency: formData.sourceCurrency,
                 originalAmount: formData.sourceAmount ? parseFloat(formData.sourceAmount) : undefined,
+                assetCurrency: formData.assetCurrency || undefined,
+                pricePerUnitInAssetCurrency: formData.pricePerUnitInAssetCurrency ? parseFloat(formData.pricePerUnitInAssetCurrency) : undefined,
                 portfolioId,
             };
 
@@ -172,6 +190,8 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                     sourceCurrency: currency,
                     sourceAmount: "",
                     exchangeRate: "1.0",
+                    assetCurrency: "",
+                    pricePerUnitInAssetCurrency: "",
                 });
             }
             router.refresh();
@@ -305,32 +325,74 @@ export function CreateTransactionDialog({ portfolioId, currency, transaction, tr
                     </div>
 
                     {['BUY', 'SELL', 'SAVEBACK', 'ROUNDUP'].includes(formData.type) && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Quantity</label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    name="quantity"
-                                    value={formData.quantity}
-                                    onChange={handleChange}
-                                    placeholder="0"
-                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                />
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-muted-foreground">Quantity</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        name="quantity"
+                                        value={formData.quantity}
+                                        onChange={handleChange}
+                                        placeholder="0"
+                                        className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-muted-foreground">Price Per Unit ({formData.currency})</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        name="pricePerUnit"
+                                        value={formData.pricePerUnit}
+                                        onChange={handleChange}
+                                        placeholder="0.00"
+                                        className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1 text-muted-foreground">Price Per Unit</label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    name="pricePerUnit"
-                                    value={formData.pricePerUnit}
-                                    onChange={handleChange}
-                                    placeholder="0.00"
-                                    className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                />
+
+                            {/* Asset Currency Section */}
+                            <div className="bg-blue-500/10 p-4 rounded-lg space-y-4 border border-blue-500/20">
+                                <div className="text-xs text-blue-400 font-medium mb-2">Asset Currency (if different from portfolio)</div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1 text-muted-foreground">Asset Currency</label>
+                                        <select
+                                            name="assetCurrency"
+                                            value={formData.assetCurrency}
+                                            onChange={handleChange}
+                                            className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                        >
+                                            <option value="">Same as portfolio</option>
+                                            <option value="USD">USD ($)</option>
+                                            <option value="EUR">EUR (€)</option>
+                                            <option value="GBP">GBP (£)</option>
+                                        </select>
+                                    </div>
+                                    {formData.assetCurrency && formData.assetCurrency !== formData.currency && (
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1 text-muted-foreground">Price Per Unit ({formData.assetCurrency})</label>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                name="pricePerUnitInAssetCurrency"
+                                                value={formData.pricePerUnitInAssetCurrency}
+                                                onChange={handleChange}
+                                                placeholder="0.00"
+                                                className="w-full bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {formData.assetCurrency && formData.assetCurrency !== formData.currency && formData.pricePerUnitInAssetCurrency && formData.pricePerUnit && (
+                                    <div className="text-xs text-blue-400">
+                                        Exchange rate: 1 {formData.assetCurrency} = {(parseFloat(formData.pricePerUnit) / parseFloat(formData.pricePerUnitInAssetCurrency)).toFixed(4)} {formData.currency}
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        </>
                     )}
 
                     <div className="flex justify-end gap-2 mt-6">

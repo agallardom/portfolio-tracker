@@ -15,6 +15,8 @@ export type TransactionData = {
     exchangeRate?: number;
     originalCurrency?: string;
     originalAmount?: number;
+    assetCurrency?: string;
+    pricePerUnitInAssetCurrency?: number;
     portfolioId: string;
 };
 
@@ -42,6 +44,8 @@ export async function createTransaction(data: TransactionData) {
                 exchangeRate: data.exchangeRate,
                 originalCurrency: data.originalCurrency,
                 originalAmount: data.originalAmount,
+                assetCurrency: data.assetCurrency,
+                pricePerUnitInAssetCurrency: data.pricePerUnitInAssetCurrency,
                 portfolioId: data.portfolioId,
             },
         });
@@ -79,6 +83,8 @@ export async function updateTransaction(id: string, data: TransactionData) {
                 exchangeRate: data.exchangeRate,
                 originalCurrency: data.originalCurrency,
                 originalAmount: data.originalAmount,
+                assetCurrency: data.assetCurrency,
+                pricePerUnitInAssetCurrency: data.pricePerUnitInAssetCurrency,
                 portfolioId: data.portfolioId,
             },
         }); revalidatePath("/");

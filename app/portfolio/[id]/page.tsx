@@ -4,10 +4,12 @@ import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
-import { getPortfolioSummary, getPortfolioHistory } from "@/actions/portfolio";
+import { getPortfolioSummary, getPortfolioHistory, getAssetBreakdown } from "@/actions/portfolio";
 import { PortfolioChart } from "@/components/portfolio-chart";
 import { RefreshPricesButton } from "@/components/refresh-prices-button";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
+import { AssetBreakdownTable } from "@/components/asset-breakdown-table";
+import { PortfolioAllocationModal } from "@/components/portfolio-allocation-modal";
 
 export default async function PortfolioPage({ params }: { params: { id: string } }) {
     const { id } = await params; // Next.js 15+ params are async
@@ -23,6 +25,7 @@ export default async function PortfolioPage({ params }: { params: { id: string }
     const { data: transactions } = await getTransactions(id);
     const { data: summary } = await getPortfolioSummary(id);
     const history = await getPortfolioHistory(id);
+    const { data: assetBreakdown } = await getAssetBreakdown(id);
 
     return (
         <div className="min-h-screen bg-background relative overflow-hidden">
@@ -156,6 +159,21 @@ export default async function PortfolioPage({ params }: { params: { id: string }
                             </div>
                         ) : null}
                     </div>
+                </div>
+
+                {/* Asset Breakdown Table - Full Width */}
+                <div className="mt-8">
+                    <div className="flex items-center gap-2 mb-6">
+                        <h2 className="text-xl font-semibold">Asset Breakdown</h2>
+                        <PortfolioAllocationModal
+                            data={assetBreakdown || []}
+                            currency={portfolio.currency}
+                        />
+                    </div>
+                    <AssetBreakdownTable
+                        data={assetBreakdown || []}
+                        currency={portfolio.currency}
+                    />
                 </div>
             </main>
         </div>

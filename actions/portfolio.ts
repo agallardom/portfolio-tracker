@@ -165,7 +165,23 @@ export async function getPortfolioSummary(portfolioId: string) {
         let assetsValue = 0;
         holdings.forEach((qty, symbol) => {
             const price = prices.get(symbol) || 0;
-            assetsValue += qty * price;
+
+            // Get asset info to check if currency conversion is needed
+            const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
+            let priceInPortfolioCurrency = price;
+
+            if (assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                // Asset trades in different currency, need to convert
+                let exchangeRate = 1.0;
+                if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
+                    exchangeRate = assetInfo.exchangeRateToUSD;
+                } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
+                    exchangeRate = assetInfo.exchangeRateToEUR;
+                }
+                priceInPortfolioCurrency = price * exchangeRate;
+            }
+
+            assetsValue += qty * priceInPortfolioCurrency;
         });
 
         const currentValue = cashBalance + assetsValue; // Total Portfolio Value
@@ -193,8 +209,186 @@ export async function getPortfolioSummary(portfolioId: string) {
     }
 }
 
+export async function getAssetBreakdown(portfolioId: string) {
+    try {
+        const portfolio = await prisma.portfolio.findUnique({
+            where: { id: portfolioId }
+        });
+
+        if (!portfolio) {
+            return { success: false, error: "Portfolio not found" };
+        }
+
+        const transactions = await prisma.transaction.findMany({
+            where: { portfolioId },
+            include: { asset: true },
+            orderBy: { date: 'asc' }
+        });
+
+        // Map to track per-asset data
+        const assetData = new Map<string, {
+            symbol: string;
+            name: string;
+            quantity: number;
+            totalCost: number;
+            totalSoldCost: number; // Cost basis of sold shares
+            realizedGain: number;
+            dividends: number;
+            currentPrice: number;
+            firstPurchaseDate: Date | null;
+        }>();
+
+        for (const tx of transactions) {
+            if (!tx.assetSymbol) continue;
+
+            // Initialize asset data if not exists
+            if (!assetData.has(tx.assetSymbol)) {
+                assetData.set(tx.assetSymbol, {
+                    symbol: tx.assetSymbol,
+                    name: tx.asset?.name || tx.assetSymbol,
+                    quantity: 0,
+                    totalCost: 0,
+                    totalSoldCost: 0,
+                    realizedGain: 0,
+                    dividends: 0,
+                    currentPrice: tx.asset?.currentPrice || 0,
+                    firstPurchaseDate: null
+                });
+            }
+
+            const data = assetData.get(tx.assetSymbol)!;
+
+            switch (tx.type) {
+                case "BUY":
+                case "SAVEBACK":
+                case "ROUNDUP":
+                    if (tx.quantity) {
+                        data.quantity += tx.quantity;
+                        data.totalCost += tx.amount + (tx.fee || 0);
+
+                        // Track first purchase date
+                        if (!data.firstPurchaseDate || tx.date < data.firstPurchaseDate) {
+                            data.firstPurchaseDate = tx.date;
+                        }
+                    }
+                    break;
+
+                case "SELL":
+                    if (tx.quantity) {
+                        // Calculate average cost per share before this sale
+                        const avgCostPerShare = data.quantity > 0 ? data.totalCost / data.quantity : 0;
+
+                        // Cost basis of shares being sold
+                        const soldCost = avgCostPerShare * tx.quantity;
+                        data.totalSoldCost += soldCost;
+
+                        // Realized gain = proceeds - cost basis - fees
+                        const proceeds = tx.amount - (tx.fee || 0);
+                        data.realizedGain += proceeds - soldCost;
+
+                        // Update quantity and remaining cost
+                        data.quantity -= tx.quantity;
+                        data.totalCost -= soldCost;
+
+                        // Ensure no negative values due to rounding
+                        if (data.quantity < 0.00001) {
+                            data.quantity = 0;
+                            data.totalCost = 0;
+                        }
+                    }
+                    break;
+
+                case "DIVIDEND":
+                    data.dividends += tx.amount;
+                    break;
+            }
+
+            // Update current price if available
+            if (tx.asset?.currentPrice) {
+                data.currentPrice = tx.asset.currentPrice;
+            }
+        }
+
+        // Convert to array and calculate final metrics
+        const breakdown = Array.from(assetData.values())
+            .filter(asset => asset.quantity > 0 || asset.realizedGain !== 0 || asset.dividends !== 0)
+            .map(asset => {
+                // Get the asset's quote currency and exchange rate
+                const assetRecord = transactions.find(tx => tx.assetSymbol === asset.symbol)?.asset;
+                const quoteCurrency = assetRecord?.quoteCurrency || portfolio.currency;
+
+                // Determine exchange rate to portfolio currency
+                let exchangeRate = 1.0;
+                if (quoteCurrency !== portfolio.currency) {
+                    if (portfolio.currency === 'USD') {
+                        exchangeRate = assetRecord?.exchangeRateToUSD || 1.0;
+                    } else if (portfolio.currency === 'EUR') {
+                        exchangeRate = assetRecord?.exchangeRateToEUR || 1.0;
+                    }
+                }
+
+                // Convert current price to portfolio currency
+                const priceInPortfolioCurrency = asset.currentPrice * exchangeRate;
+                const currentValue = asset.quantity * priceInPortfolioCurrency;
+
+                const unrealizedGain = currentValue - asset.totalCost;
+                const unrealizedGainPercent = asset.totalCost > 0 ? (unrealizedGain / asset.totalCost) * 100 : 0;
+                const avgCostPerShare = asset.quantity > 0 ? asset.totalCost / asset.quantity : 0;
+                const totalGain = asset.realizedGain + unrealizedGain;
+
+                return {
+                    symbol: asset.symbol,
+                    name: asset.name,
+                    quantity: asset.quantity,
+                    currentPrice: asset.currentPrice, // Native currency price
+                    currentPriceConverted: priceInPortfolioCurrency, // Converted to portfolio currency
+                    quoteCurrency, // Currency the asset trades in
+                    exchangeRate, // Exchange rate used
+                    avgCostPerShare,
+                    totalCost: asset.totalCost,
+                    currentValue,
+                    unrealizedGain,
+                    unrealizedGainPercent,
+                    realizedGain: asset.realizedGain,
+                    totalGain,
+                    dividends: asset.dividends,
+                    firstPurchaseDate: asset.firstPurchaseDate,
+                };
+            });
+
+        // Calculate total portfolio value for allocation percentages
+        const totalValue = breakdown.reduce((sum, asset) => sum + asset.currentValue, 0);
+
+        // Add allocation percentage
+        const breakdownWithAllocation = breakdown.map(asset => ({
+            ...asset,
+            allocationPercent: totalValue > 0 ? (asset.currentValue / totalValue) * 100 : 0
+        }));
+
+        // Sort by current value descending
+        breakdownWithAllocation.sort((a, b) => b.currentValue - a.currentValue);
+
+        return {
+            success: true,
+            data: breakdownWithAllocation
+        };
+
+    } catch (error) {
+        console.error("Error calculating asset breakdown:", error);
+        return { success: false, error: "Failed to calculate asset breakdown" };
+    }
+}
+
 export async function getPortfolioHistory(portfolioId: string) {
     try {
+        const portfolio = await prisma.portfolio.findUnique({
+            where: { id: portfolioId }
+        });
+
+        if (!portfolio) {
+            return { success: false, error: "Portfolio not found" };
+        }
+
         const transactions = await prisma.transaction.findMany({
             where: { portfolioId },
             orderBy: { date: 'asc' },
@@ -211,7 +405,24 @@ export async function getPortfolioHistory(portfolioId: string) {
         function calculateValue() {
             let val = 0;
             holdings.forEach((qty, symbol) => {
-                val += qty * (prices.get(symbol) || 0);
+                const price = prices.get(symbol) || 0;
+
+                // Get asset info to check if currency conversion is needed
+                const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
+                let priceInPortfolioCurrency = price;
+
+                if (assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                    // Asset trades in different currency, need to convert
+                    let exchangeRate = 1.0;
+                    if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
+                        exchangeRate = assetInfo.exchangeRateToUSD;
+                    } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
+                        exchangeRate = assetInfo.exchangeRateToEUR;
+                    }
+                    priceInPortfolioCurrency = price * exchangeRate;
+                }
+
+                val += qty * priceInPortfolioCurrency;
             });
             return val;
         }

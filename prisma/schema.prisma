@@ -17,11 +17,14 @@ model Portfolio {
 }
 
 model Asset {
-  symbol       String        @id
-  name         String?
-  currentPrice Float?
-  updatedAt    DateTime      @updatedAt
-  transactions Transaction[]
+  symbol            String        @id
+  name              String?
+  currentPrice      Float?        // Price in quote currency
+  quoteCurrency     String?       // Currency the asset trades in (EUR, USD, etc.)
+  exchangeRateToUSD Float?        // Exchange rate to USD
+  exchangeRateToEUR Float?        // Exchange rate to EUR
+  updatedAt         DateTime      @updatedAt
+  transactions      Transaction[]
 }
 
 model Transaction {
@@ -29,25 +32,28 @@ model Transaction {
   date         DateTime
   type         String   // "BUY", "SELL", "DIVIDEND", "SAVEBACK", "ROUNDUP"
   
-  // Amounts
-  amount       Float    // Total value in local currency (e.g. $100)
-  currency     String   // Currency of the transaction (should match Portfolio currency usually)
+  // Amounts in portfolio currency
+  amount       Float    // Total value in portfolio currency
+  currency     String   // Portfolio currency (should match Portfolio currency)
   
   // Asset info (optional for SaveBack etc)
   assetSymbol  String?
   asset        Asset?   @relation(fields: [assetSymbol], references: [symbol])
   
-  pricePerUnit Float?
+  // Price and quantity
+  pricePerUnit Float?   // Price per unit in portfolio currency
   quantity     Float?
   
   fee          Float?   @default(0)
   
-  // Exchange rate to base currency (e.g. EUR) for reporting
+  // Multi-currency transaction data
   exchangeRate Float?   @default(1.0) 
+  originalCurrency String?  // Currency used for the transaction (e.g., EUR)
+  originalAmount   Float?   // Amount in original currency
   
-  // Historical data for multi-currency
-  originalCurrency String?
-  originalAmount   Float? 
+  // Asset-specific currency tracking
+  assetCurrency              String?  // Currency the asset trades in (e.g., EUR for SAN.MC)
+  pricePerUnitInAssetCurrency Float?  // Price per unit in asset's native currency
 
   portfolioId  String
   portfolio    Portfolio @relation(fields: [portfolioId], references: [id])

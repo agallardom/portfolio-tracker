@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import YahooFinance from "yahoo-finance2";
 import { revalidatePath } from "next/cache";
+import { getExchangeRates } from "@/lib/exchange-rates";
 
 const yahooFinance = new YahooFinance();
 
@@ -44,20 +45,63 @@ export async function updatePortfolioPrices(portfolioId: string) {
                 // We assume user entered correct Yahoo symbols for now.
                 const quote = await yahooFinance.quote(symbol);
                 if (quote && quote.regularMarketPrice) {
-                    console.log(`[Price Update] Updated ${symbol}: ${quote.regularMarketPrice} (${quote.currency})`);
+                    const price = quote.regularMarketPrice;
+                    const quoteCurrency = quote.currency || 'USD'; // Default to USD if not specified
+
+                    console.log(`[Price Update] ${symbol}: ${price} ${quoteCurrency}`);
+
+                    // Fetch exchange rates for this currency
+                    let exchangeRateToUSD = 1.0;
+                    let exchangeRateToEUR = 1.0;
+
+                    if (quoteCurrency !== 'USD' && quoteCurrency !== 'EUR') {
+                        try {
+                            const rates = await getExchangeRates(quoteCurrency);
+                            exchangeRateToUSD = rates.toUSD;
+                            exchangeRateToEUR = rates.toEUR;
+                            console.log(`[Exchange Rates] ${quoteCurrency}: USD=${exchangeRateToUSD}, EUR=${exchangeRateToEUR}`);
+                        } catch (rateError) {
+                            console.warn(`[Exchange Rates] Failed to fetch rates for ${quoteCurrency}, using 1.0`);
+                        }
+                    } else if (quoteCurrency === 'USD') {
+                        exchangeRateToUSD = 1.0;
+                        // Fetch EUR rate for USD
+                        try {
+                            const rates = await getExchangeRates('USD');
+                            exchangeRateToEUR = rates.toEUR;
+                        } catch (rateError) {
+                            console.warn(`[Exchange Rates] Failed to fetch EUR rate for USD`);
+                        }
+                    } else if (quoteCurrency === 'EUR') {
+                        exchangeRateToEUR = 1.0;
+                        // Fetch USD rate for EUR
+                        try {
+                            const rates = await getExchangeRates('EUR');
+                            exchangeRateToUSD = rates.toUSD;
+                        } catch (rateError) {
+                            console.warn(`[Exchange Rates] Failed to fetch USD rate for EUR`);
+                        }
+                    }
+
                     await prisma.asset.upsert({
                         where: { symbol },
                         create: {
                             symbol,
-                            currentPrice: quote.regularMarketPrice,
+                            currentPrice: price,
+                            quoteCurrency,
+                            exchangeRateToUSD,
+                            exchangeRateToEUR,
                             name: quote.longName || quote.shortName || symbol
                         },
                         update: {
-                            currentPrice: quote.regularMarketPrice,
+                            currentPrice: price,
+                            quoteCurrency,
+                            exchangeRateToUSD,
+                            exchangeRateToEUR,
                             name: quote.longName || quote.shortName || symbol
                         }
                     });
-                    return { symbol, status: 'updated', price: quote.regularMarketPrice };
+                    return { symbol, status: 'updated', price, currency: quoteCurrency };
                 } else {
                     console.warn(`[Price Update] No valid quote for ${symbol}`, quote);
                     return { symbol, status: 'no_data', quote };
