@@ -144,3 +144,38 @@ export async function searchAssets(query: string) {
         return { success: false, error: "Failed to search assets" };
     }
 }
+
+/**
+ * Get historical prices for a symbol
+ * @param symbol Asset symbol
+ * @param startDate Start date for historical data
+ * @param endDate End date for historical data
+ * @returns Map of date string to price
+ */
+export async function getHistoricalPrices(
+    symbol: string,
+    startDate: Date,
+    endDate: Date
+): Promise<Map<string, number>> {
+    try {
+        const result = await yahooFinance.historical(symbol, {
+            period1: startDate,
+            period2: endDate,
+            interval: '1d'
+        });
+
+        const priceMap = new Map<string, number>();
+
+        result.forEach((quote: any) => {
+            if (quote.date && quote.close) {
+                const dateStr = quote.date.toISOString().split('T')[0];
+                priceMap.set(dateStr, quote.close);
+            }
+        });
+
+        return priceMap;
+    } catch (error) {
+        console.error(`Failed to fetch historical prices for ${symbol}:`, error);
+        return new Map();
+    }
+}

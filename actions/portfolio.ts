@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { getHistoricalPrices } from "./asset";
 
 export async function createPortfolio(name: string, currency: string) {
     try {
@@ -430,6 +431,9 @@ export async function getPortfolioHistory(portfolioId: string) {
         // Add initial point before first transaction? No, start at 0?
         // Let's start from first transaction date.
 
+        // First pass: process all transactions to build state at each transaction date
+        const transactionPoints = new Map<string, { invested: number, value: number }>();
+
         for (const tx of transactions) {
             // Update last known price if available in transaction
             if (tx.assetSymbol && tx.pricePerUnit) {
@@ -459,25 +463,90 @@ export async function getPortfolioHistory(portfolioId: string) {
             // Record point
             const dateStr = tx.date.toISOString().split('T')[0];
             // If multiple tx on same day, this overwrites, which is fine (end of day state)
-            points.set(dateStr, { invested, value: calculateValue() });
+            transactionPoints.set(dateStr, { invested, value: calculateValue() });
         }
 
-        // Add "Today" point with current prices if possible? 
-        // We can check if today is already there. IF not, add it.
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (!points.has(todayStr)) {
-            // Update prices to current stored prices for better accuracy at "now"?
-            // But we don't want to fetch all assets again inside this loop or complexity.
-            // Let's stick to "last transaction price" for history consistency, 
-            // OR if we want the chart to end at "Current Value" shown in summary, we should use current prices.
-            // The summary uses `tx.asset.currentPrice`. 
-            // Let's try to update prices with currentPrice from the transactions includes (which returns current DB state).
-            transactions.forEach((tx: any) => {
-                if (tx.asset && tx.asset.currentPrice) {
-                    prices.set(tx.asset.symbol, tx.asset.currentPrice);
+        // Update prices to current stored prices for today's value
+        transactions.forEach((tx: any) => {
+            if (tx.asset && tx.asset.currentPrice) {
+                prices.set(tx.asset.symbol, tx.asset.currentPrice);
+            }
+        });
+
+        // Generate daily points from first transaction to today
+        const firstDate = new Date(transactions[0].date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let currentDate = new Date(firstDate);
+        currentDate.setHours(0, 0, 0, 0);
+
+        let progressiveInvested = 0;
+        let progressiveHoldings = new Map<string, number>();
+
+        // Process transactions and generate daily points
+        for (const tx of transactions) {
+            const txDateStr = tx.date.toISOString().split('T')[0];
+            const txDate = new Date(tx.date);
+            txDate.setHours(0, 0, 0, 0);
+
+            // Fill days up to transaction date
+            while (currentDate < txDate && currentDate <= today) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                points.set(dateStr, {
+                    invested: progressiveInvested,
+                    value: calculateValue()
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            // Process transaction on its date
+            if (currentDate.getTime() === txDate.getTime() && currentDate <= today) {
+                // Update price if available
+                if (tx.assetSymbol && tx.pricePerUnit) {
+                    prices.set(tx.assetSymbol, tx.pricePerUnit);
                 }
+
+                // Update holdings and invested
+                if (tx.type === "BUY") {
+                    progressiveInvested += tx.amount + (tx.fee || 0);
+                    if (tx.assetSymbol && tx.quantity) {
+                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) + tx.quantity);
+                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
+                    }
+                } else if (tx.type === "SELL") {
+                    progressiveInvested -= tx.amount;
+                    if (tx.assetSymbol && tx.quantity) {
+                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) - tx.quantity);
+                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) - tx.quantity);
+                    }
+                } else if (tx.type === "DIVIDEND") {
+                    progressiveInvested -= tx.amount;
+                } else if (tx.type === "SAVEBACK" || tx.type === "ROUNDUP") {
+                    progressiveInvested += tx.amount;
+                    if (tx.assetSymbol && tx.quantity) {
+                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) + tx.quantity);
+                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
+                    }
+                }
+
+                const dateStr = currentDate.toISOString().split('T')[0];
+                points.set(dateStr, {
+                    invested: progressiveInvested,
+                    value: calculateValue()
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+
+        // Fill remaining days until today
+        while (currentDate <= today) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            points.set(dateStr, {
+                invested: progressiveInvested,
+                value: calculateValue()
             });
-            points.set(todayStr, { invested, value: calculateValue() });
+            currentDate.setDate(currentDate.getDate() + 1);
         }
 
         const data = Array.from(points.entries())
