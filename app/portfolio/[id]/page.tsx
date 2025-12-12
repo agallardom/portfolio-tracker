@@ -127,10 +127,10 @@ export default async function PortfolioPage({ params }: { params: { id: string }
                             </div>
                             <div className="bg-card glass-card p-4 rounded-xl">
                                 <div className="text-sm text-muted-foreground mb-1">Total Gain</div>
-                                <div className={`text-2xl font-bold font-mono ${summary?.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {summary?.totalGain >= 0 ? '+' : ''}{summary?.totalGain.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
+                                <div className={`text-2xl font-bold font-mono ${summary?.totalGain != undefined && summary?.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {summary?.totalGain != undefined && summary?.totalGain >= 0 ? '+' : ''}{summary?.totalGain.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
                                 </div>
-                                <div className={`text-sm ${summary?.totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <div className={`text-sm ${summary?.totalGainPercent != undefined && summary?.totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                     {summary?.totalGainPercent.toFixed(2)}% ROI
                                 </div>
                             </div>
