@@ -412,7 +412,7 @@ export async function getPortfolioHistory(portfolioId: string) {
                 const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
                 let priceInPortfolioCurrency = price;
 
-                if (assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                if (portfolio && assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
                     // Asset trades in different currency, need to convert
                     let exchangeRate = 1.0;
                     if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
