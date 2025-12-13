@@ -96,14 +96,37 @@ export async function updateTransaction(id: string, data: TransactionData) {
     }
 }
 
-export async function getTransactions(portfolioId: string) {
+export async function getTransactions(portfolioId: string, page: number = 1, pageSize: number = 20) {
     try {
-        const transactions = await prisma.transaction.findMany({
-            where: { portfolioId },
-            orderBy: { date: 'desc' },
-            include: { asset: true }
-        });
-        return { success: true, data: transactions };
+        const skip = (page - 1) * pageSize;
+
+        const [transactions, total] = await Promise.all([
+            prisma.transaction.findMany({
+                where: { portfolioId },
+                orderBy: { date: 'desc' },
+                include: { asset: true },
+                skip,
+                take: pageSize,
+            }),
+            prisma.transaction.count({
+                where: { portfolioId },
+            })
+        ]);
+
+        const totalPages = Math.ceil(total / pageSize);
+
+        return {
+            success: true,
+            data: transactions,
+            metadata: {
+                total,
+                page,
+                pageSize,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        };
     } catch (error) {
         return { success: false, error: "Failed to fetch transactions" };
     }

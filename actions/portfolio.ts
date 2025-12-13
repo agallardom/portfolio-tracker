@@ -237,6 +237,7 @@ export async function getAssetBreakdown(portfolioId: string) {
             dividends: number;
             currentPrice: number;
             firstPurchaseDate: Date | null;
+            transactions: typeof transactions;
         }>();
 
         for (const tx of transactions) {
@@ -253,11 +254,13 @@ export async function getAssetBreakdown(portfolioId: string) {
                     realizedGain: 0,
                     dividends: 0,
                     currentPrice: tx.asset?.currentPrice || 0,
-                    firstPurchaseDate: null
+                    firstPurchaseDate: null,
+                    transactions: [] as typeof transactions
                 });
             }
 
             const data = assetData.get(tx.assetSymbol)!;
+            data.transactions.push(tx);
 
             switch (tx.type) {
                 case "BUY":
@@ -354,6 +357,7 @@ export async function getAssetBreakdown(portfolioId: string) {
                     totalGain,
                     dividends: asset.dividends,
                     firstPurchaseDate: asset.firstPurchaseDate,
+                    transactions: asset.transactions.sort((a, b) => b.date.getTime() - a.date.getTime()) // Newest first
                 };
             });
 

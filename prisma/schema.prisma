@@ -30,7 +30,7 @@ model Asset {
 model Transaction {
   id           String   @id @default(uuid())
   date         DateTime
-  type         String   // "BUY", "SELL", "DIVIDEND", "SAVEBACK", "ROUNDUP"
+  type         String   // "BUY", "SELL", "DIVIDEND", "SAVEBACK", "ROUNDUP", "GIFT"
   
   // Amounts in portfolio currency
   amount       Float    // Total value in portfolio currency
@@ -54,6 +54,11 @@ model Transaction {
   // Asset-specific currency tracking
   assetCurrency              String?  // Currency the asset trades in (e.g., EUR for SAN.MC)
   pricePerUnitInAssetCurrency Float?  // Price per unit in asset's native currency
+
+  // Dividend Tax Details
+  withholdingTax Float?   // Tax withheld in portfolio currency
+  taxRate        Float?   // Tax rate percentage (e.g. 19.0)
+  isin           String?  // ISIN code of the asset
 
   portfolioId  String
   portfolio    Portfolio @relation(fields: [portfolioId], references: [id])

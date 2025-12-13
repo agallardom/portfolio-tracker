@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { CreateTransactionDialog } from "./create-transaction-dialog";
+import { DeleteTransactionButton } from "./delete-transaction-button";
 
 type AssetBreakdown = {
     symbol: string;
@@ -20,6 +22,7 @@ type AssetBreakdown = {
     dividends: number;
     firstPurchaseDate: Date | null;
     allocationPercent: number;
+    transactions?: any[];
 };
 
 type SortKey = keyof AssetBreakdown;
@@ -27,10 +30,12 @@ type SortDirection = 'asc' | 'desc';
 
 export function AssetBreakdownTable({
     data,
-    currency
+    currency,
+    portfolioId
 }: {
     data: AssetBreakdown[];
     currency: string;
+    portfolioId: string;
 }) {
     const [sortKey, setSortKey] = useState<SortKey>('currentValue');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -225,39 +230,103 @@ export function AssetBreakdownTable({
                                     {isExpanded && (
                                         <tr className="bg-white/5">
                                             <td colSpan={7} className="px-6 py-4">
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">Avg Cost/Share</div>
-                                                        <div className="font-mono">{asset.avgCostPerShare.toFixed(2)} {currency}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">Total Cost</div>
-                                                        <div className="font-mono">{asset.totalCost.toFixed(2)} {currency}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">Unrealized Gain</div>
-                                                        <div className={`font-mono ${asset.unrealizedGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                            {asset.unrealizedGain >= 0 ? '+' : ''}{asset.unrealizedGain.toFixed(2)} {currency}
+                                                <div className="space-y-4">
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">Avg Cost/Share</div>
+                                                            <div className="font-mono">{asset.avgCostPerShare.toFixed(2)} {currency}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">Total Cost</div>
+                                                            <div className="font-mono">{asset.totalCost.toFixed(2)} {currency}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">Unrealized Gain</div>
+                                                            <div className={`font-mono ${asset.unrealizedGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                {asset.unrealizedGain >= 0 ? '+' : ''}{asset.unrealizedGain.toFixed(2)} {currency}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">Realized Gain</div>
+                                                            <div className={`font-mono ${asset.realizedGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                {asset.realizedGain >= 0 ? '+' : ''}{asset.realizedGain.toFixed(2)} {currency}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">Dividends</div>
+                                                            <div className="font-mono text-blue-400">
+                                                                {asset.dividends > 0 ? '+' : ''}{asset.dividends.toFixed(2)} {currency}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground mb-1">First Purchase</div>
+                                                            <div className="text-sm">
+                                                                {asset.firstPurchaseDate
+                                                                    ? new Date(asset.firstPurchaseDate).toLocaleDateString()
+                                                                    : 'N/A'}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">Realized Gain</div>
-                                                        <div className={`font-mono ${asset.realizedGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                            {asset.realizedGain >= 0 ? '+' : ''}{asset.realizedGain.toFixed(2)} {currency}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">Dividends</div>
-                                                        <div className="font-mono text-blue-400">
-                                                            {asset.dividends > 0 ? '+' : ''}{asset.dividends.toFixed(2)} {currency}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted-foreground mb-1">First Purchase</div>
-                                                        <div className="text-sm">
-                                                            {asset.firstPurchaseDate
-                                                                ? new Date(asset.firstPurchaseDate).toLocaleDateString()
-                                                                : 'N/A'}
+
+                                                    {/* Embedded Transactions Table */}
+                                                    <div className="mt-4 border-t border-white/10 pt-4">
+                                                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Transactions for {asset.symbol}</h4>
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-xs text-left">
+                                                                <thead className="text-muted-foreground font-medium border-b border-white/10">
+                                                                    <tr>
+                                                                        <th className="px-4 py-2">Date</th>
+                                                                        <th className="px-4 py-2">Type</th>
+                                                                        <th className="px-4 py-2 text-right">Amnt</th>
+                                                                        <th className="px-4 py-2 text-right">Qty</th>
+                                                                        <th className="px-4 py-2 text-right">Price</th>
+                                                                        <th className="px-4 py-2 text-right">Actions</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-white/5">
+                                                                    {asset.transactions?.map((tx: any) => (
+                                                                        <tr key={tx.id} className="hover:bg-white/5">
+                                                                            <td className="px-4 py-2 whitespace-nowrap">
+                                                                                {new Date(tx.date).toLocaleDateString()} {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                            </td>
+                                                                            <td className="px-4 py-2">
+                                                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${tx.type === 'BUY' ? 'bg-green-500/10 text-green-400' :
+                                                                                    tx.type === 'SELL' ? 'bg-red-500/10 text-red-400' :
+                                                                                        'bg-blue-500/10 text-blue-400'
+                                                                                    }`}>
+                                                                                    {tx.type}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right font-mono">
+                                                                                {tx.amount.toFixed(2)} {tx.currency}
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right font-mono">
+                                                                                {tx.quantity ? tx.quantity.toFixed(4) : '-'}
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right font-mono text-muted-foreground">
+                                                                                {tx.pricePerUnit ? `@ ${tx.pricePerUnit.toFixed(2)}` : '-'}
+                                                                            </td>
+                                                                            <td className="px-4 py-2 text-right">
+                                                                                <div className="flex justify-end gap-1">
+                                                                                    <CreateTransactionDialog
+                                                                                        portfolioId={portfolioId}
+                                                                                        currency={currency}
+                                                                                        transaction={tx}
+                                                                                        trigger={
+                                                                                            <button className="p-1.5 hover:bg-white/10 rounded-md transition-colors text-muted-foreground hover:text-foreground">
+                                                                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                                                            </button>
+                                                                                        }
+                                                                                    />
+                                                                                    <div className="scale-75 origin-right">
+                                                                                        <DeleteTransactionButton transactionId={tx.id} />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
                                                         </div>
                                                     </div>
                                                 </div>
