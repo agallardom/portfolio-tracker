@@ -27,6 +27,10 @@ export function AssetSearch({ onSelect, initialValue = "" }: AssetSearchProps) {
     }, []);
 
     useEffect(() => {
+        setQuery(initialValue);
+    }, [initialValue]);
+
+    useEffect(() => {
         const timer = setTimeout(async () => {
             if (query.length >= 2) {
                 setLoading(true);

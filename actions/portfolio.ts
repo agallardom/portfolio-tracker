@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { getHistoricalPrices } from "./asset";
+import { getExchangeRate } from "@/lib/exchange-rates";
 
 export async function createPortfolio(name: string, currency: string) {
     try {
@@ -67,7 +68,11 @@ export async function getPortfolioSummary(portfolioId: string) {
             if (curr === 'USD') totalInvestedUSD += amount;
         };
 
+        // Fetch generic USD -> Portfolio Currency rate for pivot conversions
+        const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
+
         for (const tx of transactions) {
+            // ... (existing loop code until switch) ...
             // Update prices map if available
             if (tx.asset && tx.asset.currentPrice) {
                 prices.set(tx.asset.symbol, tx.asset.currentPrice);
@@ -76,6 +81,7 @@ export async function getPortfolioSummary(portfolioId: string) {
             const totalCost = tx.amount + (tx.fee || 0);
 
             switch (tx.type) {
+                // ... (existing cases) ...
                 case "DEPOSIT":
                 case "GIFT":
                     cashBalance += tx.amount;
@@ -83,19 +89,12 @@ export async function getPortfolioSummary(portfolioId: string) {
                     if (tx.originalAmount) {
                         addToInvestedCurrency(tx.originalAmount, tx.originalCurrency);
                     } else {
-                        // Fallback for legacy data (convert back using rate?) or just use current amount
-                        // If we didn't store original, we might assume amount/exchangeRate is close.
-                        // For now, let's treat legacy as:
                         addToInvestedCurrency(tx.amount / (tx.exchangeRate || 1.0), portfolio.currency);
-                        // Note: this logic might be imperfect for cross-currency legacy, but improved for new ones.
                     }
                     break;
                 case "WITHDRAWAL":
                     cashBalance -= tx.amount;
                     totalInvested -= tx.amount;
-                    // Reducing invested capital from original currency bucket is tricky without knowing WHICH bucket.
-                    // Simplified: We don't reduce the "Total Invested History" usually, but here 'totalInvested' is 'Net Invested'.
-                    // Let's approximate deduction pro-rata or just from the transaction's currency if known.
                     if (tx.originalAmount) {
                         addToInvestedCurrency(-tx.originalAmount, tx.originalCurrency);
                     } else {
@@ -103,30 +102,21 @@ export async function getPortfolioSummary(portfolioId: string) {
                     }
                     break;
                 case "BUY":
-                    // Check if we have enough cash
                     const cost = totalCost;
                     cashBalance -= cost;
-
-                    // Implicit Deposit logic:
                     if (cashBalance < 0) {
                         const shortage = Math.abs(cashBalance);
                         totalInvested += shortage;
                         cashBalance = 0;
                     }
-
                     if (tx.assetSymbol && tx.quantity) {
                         const current = holdings.get(tx.assetSymbol) || 0;
                         holdings.set(tx.assetSymbol, current + tx.quantity);
                     }
                     break;
                 case "SELL":
-                    // For SELL, amount is usually the proceeds (Cash needed to be added)
-                    // If fee is stored separately, we might need to subtract it if 'amount' is gross.
-                    // Assuming 'amount' is net proceeds for now or following previous pattern.
-                    // In previous step I saw: const proceed = tx.amount - (tx.fee || 0);
                     const proceed = tx.amount - (tx.fee || 0);
                     cashBalance += proceed;
-
                     if (tx.assetSymbol && tx.quantity) {
                         const current = holdings.get(tx.assetSymbol) || 0;
                         holdings.set(tx.assetSymbol, Math.max(0, current - tx.quantity));
@@ -137,12 +127,8 @@ export async function getPortfolioSummary(portfolioId: string) {
                     break;
                 case "SAVEBACK":
                 case "ROUNDUP":
-                    // Treated as immediate investment of a gift
                     totalInvested += tx.amount;
-                    // Add to invested breakdown (usually these are in portfolio currency, e.g. EUR for TradeRepublic? or USD?)
-                    // Assuming they are in portfolio currency for now.
                     addToInvestedCurrency(tx.amount / (tx.exchangeRate || 1.0), portfolio.currency);
-
                     if (tx.assetSymbol && tx.quantity) {
                         const current = holdings.get(tx.assetSymbol) || 0;
                         holdings.set(tx.assetSymbol, current + tx.quantity);
@@ -151,14 +137,9 @@ export async function getPortfolioSummary(portfolioId: string) {
             }
         }
 
-        // Implicit deposit logic from BUY loop above needs to be accounted for in Total Invested Breakdown too?
-        // The simple 'totalInvested' var already captures it.
-        // But our split variables (EUR/USD) might miss the implicit deposits if we don't catch them.
-        // We'd need to assume implicit deposits are in the Portfolio Currency.
+        // ... (Implicit deposit check) ...
         if (totalInvested > (totalInvestedEUR + totalInvestedUSD)) {
-            // Gap is likely implicit deposits or legacy data
             const gap = totalInvested - (totalInvestedEUR + totalInvestedUSD);
-            // Assign gap to portfolio currency
             addToInvestedCurrency(gap, portfolio.currency);
         }
 
@@ -171,15 +152,29 @@ export async function getPortfolioSummary(portfolioId: string) {
             const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
             let priceInPortfolioCurrency = price;
 
-            if (assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
-                // Asset trades in different currency, need to convert
-                let exchangeRate = 1.0;
-                if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
-                    exchangeRate = assetInfo.exchangeRateToUSD;
-                } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
-                    exchangeRate = assetInfo.exchangeRateToEUR;
+            if (assetInfo) {
+                let effectivePrice = price;
+                if (assetInfo.quoteCurrency === 'GBX' || assetInfo.quoteCurrency === 'GBp') {
+                    effectivePrice = price / 100;
                 }
-                priceInPortfolioCurrency = price * exchangeRate;
+
+                if (assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                    // Asset trades in different currency, need to convert
+                    let exchangeRate = 1.0;
+
+                    if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
+                        exchangeRate = assetInfo.exchangeRateToUSD;
+                    } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
+                        exchangeRate = assetInfo.exchangeRateToEUR;
+                    } else if (assetInfo.exchangeRateToUSD) {
+                        // Pivot Strategy: Asset -> USD -> Portfolio
+                        exchangeRate = assetInfo.exchangeRateToUSD * usdToPortfolioRate;
+                    }
+
+                    priceInPortfolioCurrency = effectivePrice * exchangeRate;
+                } else {
+                    priceInPortfolioCurrency = effectivePrice;
+                }
             }
 
             assetsValue += qty * priceInPortfolioCurrency;
@@ -313,6 +308,9 @@ export async function getAssetBreakdown(portfolioId: string) {
             }
         }
 
+        // Fetch generic USD -> Portfolio Currency rate for pivot conversions
+        const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
+
         // Convert to array and calculate final metrics
         const breakdown = Array.from(assetData.values())
             .filter(asset => asset.quantity > 0 || asset.realizedGain !== 0 || asset.dividends !== 0)
@@ -323,16 +321,25 @@ export async function getAssetBreakdown(portfolioId: string) {
 
                 // Determine exchange rate to portfolio currency
                 let exchangeRate = 1.0;
+                let effectivePrice = asset.currentPrice;
+
+                if (quoteCurrency === 'GBX' || quoteCurrency === 'GBp') {
+                    effectivePrice = asset.currentPrice / 100;
+                }
+
                 if (quoteCurrency !== portfolio.currency) {
                     if (portfolio.currency === 'USD') {
                         exchangeRate = assetRecord?.exchangeRateToUSD || 1.0;
                     } else if (portfolio.currency === 'EUR') {
                         exchangeRate = assetRecord?.exchangeRateToEUR || 1.0;
+                    } else if (assetRecord?.exchangeRateToUSD) {
+                        // Pivot Logic
+                        exchangeRate = assetRecord.exchangeRateToUSD * usdToPortfolioRate;
                     }
                 }
 
                 // Convert current price to portfolio currency
-                const priceInPortfolioCurrency = asset.currentPrice * exchangeRate;
+                const priceInPortfolioCurrency = effectivePrice * exchangeRate;
                 const currentValue = asset.quantity * priceInPortfolioCurrency;
 
                 const unrealizedGain = currentValue - asset.totalCost;
@@ -407,6 +414,8 @@ export async function getPortfolioHistory(portfolioId: string) {
         let invested = 0;
         const points = new Map<string, { invested: number, value: number }>();
 
+        const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
+
         function calculateValue() {
             let val = 0;
             holdings.forEach((qty, symbol) => {
@@ -416,15 +425,27 @@ export async function getPortfolioHistory(portfolioId: string) {
                 const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
                 let priceInPortfolioCurrency = price;
 
-                if (portfolio && assetInfo && assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
-                    // Asset trades in different currency, need to convert
-                    let exchangeRate = 1.0;
-                    if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
-                        exchangeRate = assetInfo.exchangeRateToUSD;
-                    } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
-                        exchangeRate = assetInfo.exchangeRateToEUR;
+                if (portfolio && assetInfo) {
+                    let effectivePrice = price;
+                    if (assetInfo.quoteCurrency === 'GBX' || assetInfo.quoteCurrency === 'GBp') {
+                        effectivePrice = price / 100;
                     }
-                    priceInPortfolioCurrency = price * exchangeRate;
+
+                    if (assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                        // Asset trades in different currency, need to convert
+                        let exchangeRate = 1.0;
+                        if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
+                            exchangeRate = assetInfo.exchangeRateToUSD;
+                        } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
+                            exchangeRate = assetInfo.exchangeRateToEUR;
+                        } else if (assetInfo.exchangeRateToUSD) {
+                            // Pivot
+                            exchangeRate = assetInfo.exchangeRateToUSD * usdToPortfolioRate;
+                        }
+                        priceInPortfolioCurrency = effectivePrice * exchangeRate;
+                    } else {
+                        priceInPortfolioCurrency = effectivePrice;
+                    }
                 }
 
                 val += qty * priceInPortfolioCurrency;
