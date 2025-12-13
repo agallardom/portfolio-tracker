@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/create-transaction-dialog";
-import { getPortfolioSummary, getPortfolioHistory, getAssetBreakdown } from "@/actions/portfolio";
+import { getPortfolioSummary, getPortfolioHistory, getAssetBreakdown, getPeriodPerformance } from "@/actions/portfolio";
 import { PortfolioChart } from "@/components/portfolio-chart";
+import { PerformanceChart } from "@/components/performance-chart";
 import { RefreshPricesButton } from "@/components/refresh-prices-button";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import { AssetBreakdownTable } from "@/components/asset-breakdown-table";
@@ -45,6 +46,7 @@ export default async function PortfolioPage({
     const { data: transactions, metadata } = await getTransactions(id, currentPage, itemsPerPage);
     const { data: summary } = await getPortfolioSummary(id);
     const history = await getPortfolioHistory(id);
+    const { data: performance } = await getPeriodPerformance(id);
     const { data: assetBreakdown } = await getAssetBreakdown(id);
 
     return (
@@ -69,7 +71,16 @@ export default async function PortfolioPage({
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content (Chart & Stats) */}
                     <div className="lg:col-span-2 space-y-8">
+                        {/* Value History Chart */}
                         <PortfolioChart data={history?.data || []} />
+
+                        {/* Performance Analysis Chart */}
+                        {performance && (
+                            <PerformanceChart
+                                data={performance}
+                                currency={portfolio.currency}
+                            />
+                        )}
                     </div>
 
                     {/* Sidebar (Holdings & Summary) */}

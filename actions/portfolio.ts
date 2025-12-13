@@ -580,8 +580,115 @@ export async function getPortfolioHistory(portfolioId: string) {
 
         return { success: true, data };
 
+
     } catch (error) {
         console.error("Error generating history:", error);
         return { success: false, error: "Failed to generate history" };
+    }
+}
+
+export async function getPeriodPerformance(portfolioId: string) {
+    try {
+        const historyRes = await getPortfolioHistory(portfolioId);
+        if (!historyRes.success || !historyRes.data) {
+            return { success: false, error: historyRes.error || "Failed to fetch history" };
+        }
+
+        const data = historyRes.data;
+        if (data.length === 0) return { success: true, data: { yearly: [], monthly: {} } };
+
+        // Helper to get Year/Month keys
+        const getYear = (d: string) => d.split('-')[0];
+        const getMonth = (d: string) => d.substring(0, 7); // "YYYY-MM"
+
+        const points = data;
+
+        // Group points by Year and Month
+        const years = Array.from(new Set(points.map(p => getYear(p.date)))).sort();
+
+        const yearlyPerformance = [];
+        const monthlyPerformance: Record<string, any[]> = {};
+
+        // 1. Calculate Yearly Performance
+        for (const year of years) {
+            const yearPoints = points.filter(p => getYear(p.date) === year);
+            if (yearPoints.length === 0) continue;
+
+            const start = yearPoints[0];
+            const end = yearPoints[yearPoints.length - 1];
+
+            // Find last point of previous year
+            const prevYearLastPoint = points.filter(p => getYear(p.date) < year).pop();
+
+            const startValue = prevYearLastPoint ? prevYearLastPoint.value : 0;
+            const startInvested = prevYearLastPoint ? prevYearLastPoint.invested : 0;
+
+            const endValue = end.value;
+            const endInvested = end.invested;
+
+            const netInvestedChange = endInvested - startInvested;
+            const valueChange = endValue - startValue;
+
+            const gain = valueChange - netInvestedChange;
+            // Simple ROI logic
+            const avgInvested = (startInvested + endInvested) / 2;
+            const roi = avgInvested > 0 ? (gain / avgInvested) * 100 : 0;
+
+            yearlyPerformance.push({
+                period: year,
+                gain,
+                roi,
+                invested: endInvested,
+                value: endValue
+            });
+
+            // 2. Calculate Monthly Performance for this year
+            const months = Array.from(new Set(yearPoints.map(p => getMonth(p.date)))).sort();
+            monthlyPerformance[year] = [];
+
+            for (const month of months) {
+                const monthPoints = yearPoints.filter(p => getMonth(p.date) === month);
+                const mEnd = monthPoints[monthPoints.length - 1];
+
+                // Find start reference (last point of prev month)
+                const prevMonthLastPoint = points.filter(p => p.date < monthPoints[0].date).pop();
+
+                const mStartValue = prevMonthLastPoint ? prevMonthLastPoint.value : 0;
+                const mStartInvested = prevMonthLastPoint ? prevMonthLastPoint.invested : 0;
+
+                const mEndValue = mEnd.value;
+                const mEndInvested = mEnd.invested;
+
+                const mNetFlow = mEndInvested - mStartInvested;
+                const mValChange = mEndValue - mStartValue;
+                const mGain = mValChange - mNetFlow;
+
+                const mAvgInvested = (mStartInvested + mEndInvested) / 2;
+                const mRoi = mAvgInvested > 0 ? (mGain / mAvgInvested) * 100 : 0;
+
+                const monthName = new Date(month + "-01").toLocaleString('default', { month: 'short' });
+
+                monthlyPerformance[year].push({
+                    period: monthName,
+                    fullPeriod: month,
+                    gain: mGain,
+                    roi: mRoi,
+                    invested: mEndInvested,
+                    value: mEndValue
+                });
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                yearly: yearlyPerformance,
+                monthly: monthlyPerformance
+            }
+        };
+
+    } catch (error) {
+        console.error("Error calculating period performance:", error);
+        return { success: false, error: "Failed to calculate performance" };
     }
 }
