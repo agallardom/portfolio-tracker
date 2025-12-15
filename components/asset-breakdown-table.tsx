@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { CreateTransactionDialog } from "./create-transaction-dialog";
 import { DeleteTransactionButton } from "./delete-transaction-button";
+import { TickerLogo } from "@/components/ticker-logo";
 
 type AssetBreakdown = {
     symbol: string;
@@ -156,9 +157,12 @@ export function AssetBreakdownTable({
                                 <React.Fragment key={asset.symbol}>
                                     <tr className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4">
-                                            <div>
-                                                <div className="font-medium">{asset.symbol}</div>
-                                                <div className="text-xs text-muted-foreground">{asset.name}</div>
+                                            <div className="flex items-center gap-3">
+                                                <TickerLogo symbol={asset.symbol} />
+                                                <div>
+                                                    <div className="font-medium">{asset.symbol}</div>
+                                                    <div className="text-xs text-muted-foreground">{asset.name}</div>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right font-mono">

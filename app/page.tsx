@@ -2,8 +2,33 @@ import { Navigation } from "@/components/nav";
 import { getPortfolios } from "@/actions/portfolio";
 import Link from "next/link";
 import { CreatePortfolioDialog } from "@/components/create-portfolio-dialog";
+import { db } from "@/lib/db"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
+
+export const dynamic = "force-dynamic"
 
 export default async function Home() {
+  const session = await auth()
+
+  if (!session?.user?.id) {
+    // Should be handled by middleware but as safety
+    redirect("/login")
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    include: { riskProfile: true }
+  })
+
+  // If user has no risk profile (and is not ADMIN? No, admins should also have one or skip. 
+  // Let's assume everyone needs one or only USER role. 
+  // User request: "Al entrar con el token no redirecciona al onboarding".
+  // So enforce for everyone for now.)
+  if (!user?.riskProfile) {
+    redirect("/onboarding")
+  }
+
   const { data: portfolios } = await getPortfolios();
 
   return (

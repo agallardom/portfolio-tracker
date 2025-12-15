@@ -4,13 +4,20 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { getHistoricalPrices } from "./asset";
 import { getExchangeRate } from "@/lib/exchange-rates";
+import { auth } from "@/auth";
 
 export async function createPortfolio(name: string, currency: string) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { success: false, error: "Unauthorized" };
+        }
+
         const portfolio = await prisma.portfolio.create({
             data: {
                 name,
                 currency,
+                userId: session.user.id,
             },
         });
         revalidatePath("/");
@@ -22,7 +29,15 @@ export async function createPortfolio(name: string, currency: string) {
 
 export async function getPortfolios() {
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { success: false, data: [] };
+        }
+
         const portfolios = await prisma.portfolio.findMany({
+            where: {
+                userId: session.user.id,
+            },
             include: {
                 transactions: true,
             },
@@ -56,12 +71,14 @@ export async function getPortfolioSummary(portfolioId: string) {
         let totalInvestedEUR = 0;
         let totalInvestedUSD = 0;
         let cashBalance = 0;
-        const holdings = new Map<string, number>();
+        const holdings = new Map<string, { qty: number, cost: number }>();
         const prices = new Map<string, number>();
+        let realizedGains = 0;
+        let totalDividends = 0;
+        let totalFees = 0;
+        let explicitInvested = 0;
 
         // Helper to track original currency investment
-        // If originalCurrency doesn't exist (legacy), we assume it matched the portfolio currency (e.g. USD if portfolio is USD)
-        // Or we just skip it.
         const addToInvestedCurrency = (amount: number, currency?: string | null) => {
             const curr = currency || portfolio.currency;
             if (curr === 'EUR') totalInvestedEUR += amount;
@@ -72,20 +89,21 @@ export async function getPortfolioSummary(portfolioId: string) {
         const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
 
         for (const tx of transactions) {
-            // ... (existing loop code until switch) ...
             // Update prices map if available
             if (tx.asset && tx.asset.currentPrice) {
                 prices.set(tx.asset.symbol, tx.asset.currentPrice);
             }
 
-            const totalCost = tx.amount + (tx.fee || 0);
+            const fee = tx.fee || 0;
+            totalFees += fee;
+            const totalCost = tx.amount + fee;
 
             switch (tx.type) {
-                // ... (existing cases) ...
                 case "DEPOSIT":
                 case "GIFT":
                     cashBalance += tx.amount;
                     totalInvested += tx.amount;
+                    explicitInvested += tx.amount;
                     if (tx.originalAmount) {
                         addToInvestedCurrency(tx.originalAmount, tx.originalCurrency);
                     } else {
@@ -95,6 +113,7 @@ export async function getPortfolioSummary(portfolioId: string) {
                 case "WITHDRAWAL":
                     cashBalance -= tx.amount;
                     totalInvested -= tx.amount;
+                    explicitInvested -= tx.amount;
                     if (tx.originalAmount) {
                         addToInvestedCurrency(-tx.originalAmount, tx.originalCurrency);
                     } else {
@@ -102,42 +121,55 @@ export async function getPortfolioSummary(portfolioId: string) {
                     }
                     break;
                 case "BUY":
-                    const cost = totalCost;
-                    cashBalance -= cost;
-                    if (cashBalance < 0) {
-                        const shortage = Math.abs(cashBalance);
-                        totalInvested += shortage;
-                        cashBalance = 0;
-                    }
-                    if (tx.assetSymbol && tx.quantity) {
-                        const current = holdings.get(tx.assetSymbol) || 0;
-                        holdings.set(tx.assetSymbol, current + tx.quantity);
+                    cashBalance -= totalCost;
+                    if (tx.assetSymbol) {
+                        const current = holdings.get(tx.assetSymbol) || { qty: 0, cost: 0 };
+                        holdings.set(tx.assetSymbol, {
+                            qty: current.qty + (tx.quantity || 0),
+                            cost: current.cost + totalCost
+                        });
                     }
                     break;
                 case "SELL":
                     const proceed = tx.amount - (tx.fee || 0);
                     cashBalance += proceed;
+
                     if (tx.assetSymbol && tx.quantity) {
-                        const current = holdings.get(tx.assetSymbol) || 0;
-                        holdings.set(tx.assetSymbol, Math.max(0, current - tx.quantity));
+                        const current = holdings.get(tx.assetSymbol) || { qty: 0, cost: 0 };
+                        if (current.qty > 0) {
+                            const avgCost = current.cost / current.qty;
+                            const costOfSold = avgCost * tx.quantity;
+                            const gain = proceed - costOfSold; // Realized Gain
+                            realizedGains += gain;
+
+                            holdings.set(tx.assetSymbol, {
+                                qty: Math.max(0, current.qty - tx.quantity),
+                                cost: Math.max(0, current.cost - costOfSold)
+                            });
+                        }
                     }
                     break;
                 case "DIVIDEND":
                     cashBalance += tx.amount;
+                    totalDividends += tx.amount;
                     break;
                 case "SAVEBACK":
                 case "ROUNDUP":
                     totalInvested += tx.amount;
+                    explicitInvested += tx.amount;
                     addToInvestedCurrency(tx.amount / (tx.exchangeRate || 1.0), portfolio.currency);
                     if (tx.assetSymbol && tx.quantity) {
-                        const current = holdings.get(tx.assetSymbol) || 0;
-                        holdings.set(tx.assetSymbol, current + tx.quantity);
+                        const current = holdings.get(tx.assetSymbol) || { qty: 0, cost: 0 };
+                        holdings.set(tx.assetSymbol, {
+                            qty: current.qty + tx.quantity,
+                            cost: current.cost + tx.amount
+                        });
                     }
                     break;
             }
         }
 
-        // ... (Implicit deposit check) ...
+        // Implicit deposit check for currency consistency
         if (totalInvested > (totalInvestedEUR + totalInvestedUSD)) {
             const gap = totalInvested - (totalInvestedEUR + totalInvestedUSD);
             addToInvestedCurrency(gap, portfolio.currency);
@@ -145,7 +177,7 @@ export async function getPortfolioSummary(portfolioId: string) {
 
         // Calculate Market Value
         let assetsValue = 0;
-        holdings.forEach((qty, symbol) => {
+        holdings.forEach((data, symbol) => {
             const price = prices.get(symbol) || 0;
 
             // Get asset info to check if currency conversion is needed
@@ -177,22 +209,35 @@ export async function getPortfolioSummary(portfolioId: string) {
                 }
             }
 
-            assetsValue += qty * priceInPortfolioCurrency;
+            assetsValue += data.qty * priceInPortfolioCurrency;
         });
 
+        // Apply User Request: Net Invested = Deposits + Gifts +/- Realized + Dividends - Fees
+        // Using explicitInvested (Net Deposits) to avoid counting implicit shortages caused by fee timing.
+        const netInvested = explicitInvested + realizedGains + totalDividends - totalFees;
+
+        console.log(`[PortfolioSummary] Invested: ${totalInvested}, Realized: ${realizedGains}, Divs: ${totalDividends}, Fees: ${totalFees} => Net: ${netInvested}`);
+
+
+
         const currentValue = cashBalance + assetsValue; // Total Portfolio Value
-        const totalGain = currentValue - totalInvested;
-        const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0;
+        const totalGain = currentValue - explicitInvested;
+        const totalGainPercent = explicitInvested > 0 ? (totalGain / explicitInvested) * 100 : 0;
+
+        // Calculate Value in EUR for display
+        const portfolioToEURRate = await getExchangeRate(portfolio.currency, "EUR");
+        const currentValueEUR = currentValue * portfolioToEURRate;
 
         return {
             success: true,
             data: {
-                totalInvested,
+                totalInvested: explicitInvested,
                 totalInvestedEUR,
                 totalInvestedUSD,
                 cashBalance,
                 assetsValue,
                 currentValue,
+                currentValueEUR,
                 totalGain,
                 totalGainPercent,
                 currency: portfolio.currency
@@ -225,6 +270,7 @@ export async function getAssetBreakdown(portfolioId: string) {
         const assetData = new Map<string, {
             symbol: string;
             name: string;
+            assetClass: string; // Add this
             quantity: number;
             totalCost: number;
             totalSoldCost: number; // Cost basis of sold shares
@@ -243,6 +289,7 @@ export async function getAssetBreakdown(portfolioId: string) {
                 assetData.set(tx.assetSymbol, {
                     symbol: tx.assetSymbol,
                     name: tx.asset?.name || tx.assetSymbol,
+                    assetClass: tx.asset?.assetClass || "EQUITY", // Add this
                     quantity: 0,
                     totalCost: 0,
                     totalSoldCost: 0,
@@ -261,14 +308,12 @@ export async function getAssetBreakdown(portfolioId: string) {
                 case "BUY":
                 case "SAVEBACK":
                 case "ROUNDUP":
-                    if (tx.quantity) {
-                        data.quantity += tx.quantity;
-                        data.totalCost += tx.amount + (tx.fee || 0);
+                    data.quantity += (tx.quantity || 0);
+                    data.totalCost += tx.amount + (tx.fee || 0);
 
-                        // Track first purchase date
-                        if (!data.firstPurchaseDate || tx.date < data.firstPurchaseDate) {
-                            data.firstPurchaseDate = tx.date;
-                        }
+                    // Track first purchase date
+                    if (!data.firstPurchaseDate || tx.date < data.firstPurchaseDate) {
+                        data.firstPurchaseDate = tx.date;
                     }
                     break;
 
@@ -363,6 +408,7 @@ export async function getAssetBreakdown(portfolioId: string) {
                     realizedGain: asset.realizedGain,
                     totalGain,
                     dividends: asset.dividends,
+                    assetClass: asset.assetClass, // Add this
                     firstPurchaseDate: asset.firstPurchaseDate,
                     transactions: asset.transactions.sort((a, b) => b.date.getTime() - a.date.getTime()) // Newest first
                 };
@@ -409,168 +455,203 @@ export async function getPortfolioHistory(portfolioId: string) {
 
         if (transactions.length === 0) return { success: true, data: [] };
 
-        const holdings = new Map<string, number>();
-        const prices = new Map<string, number>();
-        let invested = 0;
-        const points = new Map<string, { invested: number, value: number }>();
-
-        const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
-
-        function calculateValue() {
-            let val = 0;
-            holdings.forEach((qty, symbol) => {
-                const price = prices.get(symbol) || 0;
-
-                // Get asset info to check if currency conversion is needed
-                const assetInfo = transactions.find(tx => tx.assetSymbol === symbol)?.asset;
-                let priceInPortfolioCurrency = price;
-
-                if (portfolio && assetInfo) {
-                    let effectivePrice = price;
-                    if (assetInfo.quoteCurrency === 'GBX' || assetInfo.quoteCurrency === 'GBp') {
-                        effectivePrice = price / 100;
-                    }
-
-                    if (assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
-                        // Asset trades in different currency, need to convert
-                        let exchangeRate = 1.0;
-                        if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
-                            exchangeRate = assetInfo.exchangeRateToUSD;
-                        } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
-                            exchangeRate = assetInfo.exchangeRateToEUR;
-                        } else if (assetInfo.exchangeRateToUSD) {
-                            // Pivot
-                            exchangeRate = assetInfo.exchangeRateToUSD * usdToPortfolioRate;
-                        }
-                        priceInPortfolioCurrency = effectivePrice * exchangeRate;
-                    } else {
-                        priceInPortfolioCurrency = effectivePrice;
-                    }
-                }
-
-                val += qty * priceInPortfolioCurrency;
-            });
-            return val;
-        }
-
-        // Add initial point before first transaction? No, start at 0?
-        // Let's start from first transaction date.
-
-        // First pass: process all transactions to build state at each transaction date
-        const transactionPoints = new Map<string, { invested: number, value: number }>();
-
-        for (const tx of transactions) {
-            // Update last known price if available in transaction
-            if (tx.assetSymbol && tx.pricePerUnit) {
-                prices.set(tx.assetSymbol, tx.pricePerUnit);
-            }
-
-            // Logic matching summary calculation, but progressive
-            if (tx.type === "BUY") {
-                invested += tx.amount + (tx.fee || 0);
-                if (tx.assetSymbol && tx.quantity) {
-                    holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
-                }
-            } else if (tx.type === "SELL") {
-                invested -= tx.amount;
-                if (tx.assetSymbol && tx.quantity) {
-                    holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) - tx.quantity);
-                }
-            } else if (tx.type === "DIVIDEND") {
-                invested -= tx.amount;
-            } else if (tx.type === "SAVEBACK" || tx.type === "ROUNDUP") {
-                invested += tx.amount;
-                if (tx.assetSymbol && tx.quantity) {
-                    holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
-                }
-            }
-
-            // Record point
-            const dateStr = tx.date.toISOString().split('T')[0];
-            // If multiple tx on same day, this overwrites, which is fine (end of day state)
-            transactionPoints.set(dateStr, { invested, value: calculateValue() });
-        }
-
-        // Update prices to current stored prices for today's value
-        transactions.forEach((tx: any) => {
-            if (tx.asset && tx.asset.currentPrice) {
-                prices.set(tx.asset.symbol, tx.asset.currentPrice);
-            }
-        });
-
-        // Generate daily points from first transaction to today
         const firstDate = new Date(transactions[0].date);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // 1. Fetch historical prices for all assets
+        const uniqueAssets = Array.from(new Set(
+            transactions
+                .map(t => t.assetSymbol)
+                .filter(s => s !== null)
+        )) as string[];
+
+        console.log(`[History] Fetching history for assets: ${uniqueAssets.join(", ")}`);
+
+        // Fetch prices from a bit before first date to ensure we have a starting price if needed
+        const fetchStartDate = new Date(firstDate);
+        fetchStartDate.setDate(fetchStartDate.getDate() - 5);
+
+        const priceHistories = new Map<string, Map<string, number>>();
+
+        await Promise.all(uniqueAssets.map(async (symbol) => {
+            const history = await getHistoricalPrices(symbol, fetchStartDate, today);
+            priceHistories.set(symbol, history);
+        }));
+
+        // 2. Build Daily History
         let currentDate = new Date(firstDate);
         currentDate.setHours(0, 0, 0, 0);
 
-        let progressiveInvested = 0;
-        let progressiveHoldings = new Map<string, number>();
+        const points = new Map<string, { invested: number, value: number }>();
+        const holdings = new Map<string, number>();
+        let invested = 0;
+        let cashBalance = 0; // Track cash if we want Total Value = Cash + Assets. 
+        // But usually "Performance" graph is Total Portfolio Value.
+        // Transactions track cash flow.
 
-        // Process transactions and generate daily points
-        for (const tx of transactions) {
-            const txDateStr = tx.date.toISOString().split('T')[0];
-            const txDate = new Date(tx.date);
-            txDate.setHours(0, 0, 0, 0);
+        // Pre-calculate USD/EUR rate history? 
+        // For simplicity, we might use current exchange rate or fetch history if critical.
+        // Let's use current rate for now to avoid complexity explosion, 
+        // acknowledging roughly correct for recent past, might diverge for 2010.
+        // A better approach is storing the historical exchange rate in the Transaction or fetching it.
+        const usdToPortfolioRate = await getExchangeRate("USD", portfolio.currency);
 
-            // Fill days up to transaction date
-            while (currentDate < txDate && currentDate <= today) {
-                const dateStr = currentDate.toISOString().split('T')[0];
-                points.set(dateStr, {
-                    invested: progressiveInvested,
-                    value: calculateValue()
-                });
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
+        const lastKnownPrices = new Map<string, number>();
 
-            // Process transaction on its date
-            if (currentDate.getTime() === txDate.getTime() && currentDate <= today) {
-                // Update price if available
-                if (tx.assetSymbol && tx.pricePerUnit) {
-                    prices.set(tx.assetSymbol, tx.pricePerUnit);
-                }
-
-                // Update holdings and invested
-                if (tx.type === "BUY") {
-                    progressiveInvested += tx.amount + (tx.fee || 0);
-                    if (tx.assetSymbol && tx.quantity) {
-                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) + tx.quantity);
-                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
-                    }
-                } else if (tx.type === "SELL") {
-                    progressiveInvested -= tx.amount;
-                    if (tx.assetSymbol && tx.quantity) {
-                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) - tx.quantity);
-                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) - tx.quantity);
-                    }
-                } else if (tx.type === "DIVIDEND") {
-                    progressiveInvested -= tx.amount;
-                } else if (tx.type === "SAVEBACK" || tx.type === "ROUNDUP") {
-                    progressiveInvested += tx.amount;
-                    if (tx.assetSymbol && tx.quantity) {
-                        progressiveHoldings.set(tx.assetSymbol, (progressiveHoldings.get(tx.assetSymbol) || 0) + tx.quantity);
-                        holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
-                    }
-                }
-
-                const dateStr = currentDate.toISOString().split('T')[0];
-                points.set(dateStr, {
-                    invested: progressiveInvested,
-                    value: calculateValue()
-                });
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-        }
-
-        // Fill remaining days until today
         while (currentDate <= today) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            points.set(dateStr, {
-                invested: progressiveInvested,
-                value: calculateValue()
+
+            // Apply transactions for this day
+            // We use filtered list to optimize? No, just iterate linear is fine for < 10k txs.
+            // Better: pointer to transactions array.
+
+            // Note: transactions are ordered by date.
+            // But we need to handle multiple transactions per day.
+
+            const dayTransactions = transactions.filter(t => {
+                const tDate = new Date(t.date);
+                tDate.setHours(0, 0, 0, 0);
+                return tDate.getTime() === currentDate.getTime();
             });
+
+            for (const tx of dayTransactions) {
+                // Update invested (Cost Basis / Net Inflow)
+                // Logic: "Invested" usually means Net Deposit.
+                // If I buy, Invested doesn't change (Cash -> Asset).
+                // If I Deposit, Invested increases.
+                // Let's align with Summary logic:
+
+                switch (tx.type) {
+                    case "DEPOSIT":
+                    case "GIFT":
+                        invested += tx.amount;
+                        cashBalance += tx.amount;
+                        break;
+                    case "WITHDRAWAL":
+                        invested -= tx.amount;
+                        cashBalance -= tx.amount;
+                        break;
+                    case "BUY":
+                        // Buying (Cash -> Asset). 
+                        // Invested (Net Deposit) stays same.
+                        // Cash decreases.
+                        cashBalance -= (tx.amount + (tx.fee || 0));
+                        if (tx.assetSymbol && tx.quantity) {
+                            holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
+                        }
+                        break;
+                    case "SELL":
+                        // Selling (Asset -> Cash).
+                        // Invested stays same.
+                        // Cash increases.
+                        cashBalance += (tx.amount - (tx.fee || 0));
+                        if (tx.assetSymbol && tx.quantity) {
+                            holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) - tx.quantity);
+                        }
+                        break;
+                    case "DIVIDEND":
+                        // Cash increases.
+                        // Invested? Dividend is "Return", so Net Invested shouldn't change?
+                        // OR implies we have more cash without depositing. 
+                        // Usually Dividend is essentially "Profit realized as Cash".
+                        // If we track "Net Invested", Dividend does not increase it on its own.
+                        cashBalance += tx.amount;
+                        break;
+                    case "SAVEBACK":
+                    case "ROUNDUP":
+                        // External money coming in (like Reward).
+                        // Treated as Deposit or "Gift".
+                        invested += tx.amount; // It's new money added to the cost basis
+                        // But it's immediately used to buy asset (usually).
+                        // If logic says "Saveback" is money from bank -> Asset.
+                        // So Invested += amount. 
+                        // And Holdings += quantity.
+                        if (tx.assetSymbol && tx.quantity) {
+                            holdings.set(tx.assetSymbol, (holdings.get(tx.assetSymbol) || 0) + tx.quantity);
+                        }
+                        break;
+                }
+            }
+
+            // Calculate Value for this day
+            let assetsValue = 0;
+
+            holdings.forEach((qty, symbol) => {
+                if (qty <= 0) return;
+
+                // Lookup price
+                const history = priceHistories.get(symbol);
+                let price = history?.get(dateStr);
+
+                // Fallback to last known price
+                if (price === undefined) {
+                    price = lastKnownPrices.get(symbol);
+                }
+
+                // If still no price (e.g. weekend/before history start), try closest previous?
+                // The history map should utilize filling or we do it here.
+                // Assuming `getHistoricalPrices` returns traded days.
+                // If undefined, retain lastKnown.
+
+                if (price !== undefined) {
+                    lastKnownPrices.set(symbol, price);
+
+                    // Conversion logic (Simplified using current rate - risky for long history but acceptable for now)
+                    // TODO: Improve with historical FX rates
+
+                    // Check asset currency
+                    // We need `asset` info. We have it from `transactions` (find any tx with this symbol).
+                    const assetInfo = transactions.find(t => t.assetSymbol === symbol)?.asset;
+
+                    let effectivePrice = price; // In quote currency
+
+                    if (assetInfo) {
+                        if (assetInfo.quoteCurrency === 'GBX' || assetInfo.quoteCurrency === 'GBp') {
+                            effectivePrice = price / 100;
+                        }
+
+                        // FX Conversion
+                        // We use the static rates from assetInfo (current rates) or global fallback
+                        // Ideally we'd have historical FX.
+
+                        if (assetInfo.quoteCurrency && assetInfo.quoteCurrency !== portfolio.currency) {
+                            let exchangeRate = 1.0;
+                            // Approximating using CURRENT rates store in Asset. 
+                            // This causes inaccuracies for past years if FX moved a lot.
+                            // But better than nothing.
+                            if (portfolio.currency === 'USD' && assetInfo.exchangeRateToUSD) {
+                                exchangeRate = assetInfo.exchangeRateToUSD;
+                            } else if (portfolio.currency === 'EUR' && assetInfo.exchangeRateToEUR) {
+                                exchangeRate = assetInfo.exchangeRateToEUR;
+                            } else if (assetInfo.exchangeRateToUSD) {
+                                exchangeRate = assetInfo.exchangeRateToUSD * usdToPortfolioRate;
+                            }
+                            effectivePrice = effectivePrice * exchangeRate;
+                        }
+                    }
+
+                    assetsValue += qty * effectivePrice;
+                } else {
+                    // No price known at all?
+                    // Maybe use purchase price from transaction if available?
+                    // Complex to lookup "Last Buy Price".
+                    // Ignore for now or assume 0 (which causes drop).
+                    // Or search forward? No, look for any price in history?
+                    // Use 0 safer than noise.
+                }
+            });
+
+            const totalValue = cashBalance + assetsValue;
+
+            // Correction: If totalValue < 0 (due to margin/shorting or bad data), clamp?
+            // Just record it.
+
+            points.set(dateStr, {
+                invested,
+                value: totalValue
+            });
+
             currentDate.setDate(currentDate.getDate() + 1);
         }
 
@@ -579,7 +660,6 @@ export async function getPortfolioHistory(portfolioId: string) {
             .map(([date, val]) => ({ date, ...val }));
 
         return { success: true, data };
-
 
     } catch (error) {
         console.error("Error generating history:", error);

@@ -146,3 +146,18 @@ export async function deleteTransaction(id: string) {
         return { success: false, error: "Failed to delete transaction" };
     }
 }
+
+export async function deleteAllTransactions(portfolioId: string) {
+    try {
+        await prisma.transaction.deleteMany({
+            where: { portfolioId }
+        });
+
+        revalidatePath("/");
+        revalidatePath(`/portfolio/${portfolioId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Delete all transactions error:", error);
+        return { success: false, error: "Failed to delete all transactions" };
+    }
+}

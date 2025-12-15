@@ -12,6 +12,8 @@ import { DeleteTransactionButton } from "@/components/delete-transaction-button"
 import { AssetBreakdownTable } from "@/components/asset-breakdown-table";
 import { PortfolioAllocationModal } from "@/components/portfolio-allocation-modal";
 import { ImportTransactionsDialog } from "@/components/import-transactions-dialog";
+import { ImportAdjustmentsDialog } from "@/components/import-adjustments-dialog";
+import { DeleteAllTransactionsButton } from "@/components/delete-all-transactions-button";
 
 // ... (previous imports)
 import Link from "next/link";
@@ -64,6 +66,8 @@ export default async function PortfolioPage({
                     <div className="flex gap-2">
                         <RefreshPricesButton portfolioId={portfolio.id} />
                         <ImportTransactionsDialog portfolioId={portfolio.id} />
+                        <ImportAdjustmentsDialog portfolioId={portfolio.id} />
+                        <DeleteAllTransactionsButton portfolioId={portfolio.id} />
                         <CreateTransactionDialog portfolioId={portfolio.id} currency={portfolio.currency} />
                     </div>
                 </header>
@@ -91,12 +95,22 @@ export default async function PortfolioPage({
                                 <div className="text-2xl font-bold font-mono">
                                     {summary?.currentValue.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
                                 </div>
+                                {summary?.currentValueEUR && portfolio?.currency !== 'EUR' && (
+                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
+                                        ≈ {summary.currentValueEUR.toFixed(2)} EUR
+                                    </div>
+                                )}
                             </div>
                             <div className="bg-card glass-card p-4 rounded-xl">
-                                <div className="text-sm text-muted-foreground mb-1">Net Invested</div>
+                                <div className="text-sm text-muted-foreground mb-1">Total Invested</div>
                                 <div className="text-2xl font-bold font-mono">
                                     {summary?.totalInvested.toFixed(2)} <span className="text-sm text-muted-foreground">{portfolio?.currency}</span>
                                 </div>
+                                {(summary?.totalInvestedEUR ?? 0) > 0 && (
+                                    <div className="text-xs text-muted-foreground mt-1 font-mono">
+                                        {summary?.totalInvestedEUR?.toFixed(2)} EUR
+                                    </div>
+                                )}
                             </div>
                             <div className="bg-card glass-card p-4 rounded-xl">
                                 <div className="text-sm text-muted-foreground mb-1">Total Gain</div>
@@ -119,18 +133,6 @@ export default async function PortfolioPage({
                         </div>
 
                         {/* Breakdown by Source Currency */}
-                        {(summary?.totalInvestedEUR ? summary.totalInvestedEUR > 0 : false) || (summary?.totalInvestedUSD ? summary.totalInvestedUSD > 0 : false) ? (
-                            <div className="grid grid-cols-2 gap-4 mt-4 lg:grid-cols-2">
-                                <div className="bg-secondary/20 p-3 rounded-lg flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">Invested (EUR Source)</span>
-                                    <span className="font-mono">{summary?.totalInvestedEUR?.toFixed(2) || '0.00'} €</span>
-                                </div>
-                                <div className="bg-secondary/20 p-3 rounded-lg flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">Invested (USD Source)</span>
-                                    <span className="font-mono">{summary?.totalInvestedUSD?.toFixed(2) || '0.00'} $</span>
-                                </div>
-                            </div>
-                        ) : null}
                     </div>
                 </div>
 

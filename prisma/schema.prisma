@@ -7,18 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 model Portfolio {
   id           String        @id @default(uuid())
   name         String
   currency     String        // "USD" or "EUR"
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+
   transactions Transaction[]
 }
+
 
 model Asset {
   symbol            String        @id
   name              String?
+  assetClass        String?       @default("EQUITY") // "EQUITY", "FIXED_INCOME", "CASH", "CRYPTO"
   currentPrice      Float?        // Price in quote currency
   quoteCurrency     String?       // Currency the asset trades in (EUR, USD, etc.)
   exchangeRateToUSD Float?        // Exchange rate to USD
@@ -65,4 +72,43 @@ model Transaction {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("USER") // "ADMIN", "USER"
+  mfaEnabled    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  portfolios    Portfolio[]
+  riskProfile   RiskProfile?
+}
+
+model InvitationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String   @unique // One pending invitation per email
+  status    String   @default("ACTIVE") // "ACTIVE", "USED", "EXPIRED"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RiskProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  score       Int
+  profile     String   // "Conservative", "Moderate", "Balanced", "Dynamic", "Aggressive"
+  
+  // Detailed answers can be stored here or in a separate table if we want question-level granularity.
+  // Storing as JSON string or keeping it simple for now; User request says "Cuestionario... Data Gathering".
+  // Let's store the breakdown.
+  answers     String   // JSON string of answers e.g. { "q1": 5, "q2": 3 ... }
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

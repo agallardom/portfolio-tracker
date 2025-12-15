@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { LayoutDashboard, PieChart, ArrowRightLeft, FileText } from "lucide-react";
+import { auth } from "@/auth";
+import { UserMenu } from "@/components/user-menu";
 
-export function Navigation() {
+export async function Navigation() {
+    const session = await auth();
+
     return (
         <nav className="border-b border-white/10 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
@@ -12,19 +16,23 @@ export function Navigation() {
                     <span className="font-bold text-lg tracking-tight">Portfolio</span>
                 </div>
 
-                <div className="flex items-center gap-1">
-                    <Link href="/" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                        <LayoutDashboard className="w-4 h-4" />
-                        Dashboard
-                    </Link>
-                    <Link href="/transactions" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                        <ArrowRightLeft className="w-4 h-4" />
-                        Transactions
-                    </Link>
-                    <Link href="/reports" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Reports
-                    </Link>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                        <Link href="/" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+                            <LayoutDashboard className="w-4 h-4" />
+                            Dashboard
+                        </Link>
+                        <Link href="/transactions" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+                            <ArrowRightLeft className="w-4 h-4" />
+                            Transactions
+                        </Link>
+                        <Link href="/reports" className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Reports
+                        </Link>
+                    </div>
+
+                    <UserMenu email={session?.user?.email} />
                 </div>
             </div>
         </nav>

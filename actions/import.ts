@@ -23,6 +23,7 @@ interface EtoroTransaction {
     taxRate?: number;
     isin?: string;
     assetCurrency?: string;
+    fee?: number;
 }
 
 function parseDate(dateStr: string): Date {
@@ -221,6 +222,22 @@ export async function importEtoroTransactions(portfolioId: string, formData: For
                     originalId: id,
                     details: details
                 });
+            } else if (type === 'Rollover Fee' || type === 'SDRT' || details.includes('SDRT') || details.includes('Stamp Duty')) {
+                const { symbol, currency: assetCurrency } = parseAssetDetails(details);
+                transactions.push({
+                    id: randomUUID(),
+                    date,
+                    type: 'BUY',
+                    amount: Math.abs(amount),
+                    currency: 'USD',
+                    assetSymbol: symbol,
+                    quantity: 0,
+                    pricePerUnit: 0,
+                    originalId: id,
+                    details: details,
+                    fee: Math.abs(amount),
+                    assetCurrency: assetCurrency || undefined
+                });
             }
         });
 
@@ -253,14 +270,47 @@ export async function importEtoroTransactions(portfolioId: string, formData: For
             });
         }
 
+        // Merge Fees
+        const mergedTransactions: EtoroTransaction[] = [];
+        const byOriginalId = new Map<string, EtoroTransaction[]>();
+
+        for (const t of transactions) {
+            if (!t.originalId || t.originalId === '-' || t.originalId === '0') {
+                mergedTransactions.push(t);
+                continue;
+            }
+            const list = byOriginalId.get(t.originalId) || [];
+            list.push(t);
+            byOriginalId.set(t.originalId, list);
+        }
+
+        for (const [origId, group] of byOriginalId) {
+            const mainTx = group.find(t => t.type === 'BUY' && t.quantity > 0);
+
+            if (mainTx) {
+                const fees = group.filter(t => t !== mainTx && t.type === 'BUY' && t.quantity === 0 && (t.fee || 0) > 0);
+                fees.forEach(feeTx => {
+                    mainTx.fee = (mainTx.fee || 0) + (feeTx.fee || 0);
+                });
+                mergedTransactions.push(mainTx);
+                const others = group.filter(t => t !== mainTx && !fees.includes(t));
+                mergedTransactions.push(...others);
+            } else {
+                mergedTransactions.push(...group);
+            }
+        }
+
+        transactions.length = 0;
+        transactions.push(...mergedTransactions);
+
         // 4. Sort
         transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
         // 5. DB Operations
-        // Clear Existing (Full Sync)
-        await prisma.transaction.deleteMany({
-            where: { portfolioId: portfolioId }
-        });
+        // Prevent auto-delete as per user request
+        // await prisma.transaction.deleteMany({
+        //     where: { portfolioId: portfolioId }
+        // });
 
         let createdCount = 0;
 
@@ -309,7 +359,8 @@ export async function importEtoroTransactions(portfolioId: string, formData: For
                     withholdingTax: t.withholdingTax,
                     taxRate: t.taxRate,
                     isin: t.isin,
-                    assetCurrency: t.assetCurrency
+                    assetCurrency: t.assetCurrency,
+                    fee: t.fee,
                 }
             });
             createdCount++;

@@ -1,0 +1,673 @@
+{
+  "portfolio_summary": [
+    {
+      "asset_name": "MAP.MC - Mapfre",
+      "current_price": 4.1397,
+      "daily_change": 0.0377,
+      "daily_change_percentage": 0.92,
+      "total_investment_units": 75.948849,
+      "average_cost_per_unit": 1.9395,
+      "net_value": 352.90,
+      "total_profit_loss": 196.75,
+      "total_profit_loss_percentage": 126.00,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "28/12/2023 09:00",
+          "units": 5.56,
+          "opening_price": 1.9620,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.29,
+          "g_p": 14.26,
+          "g_p_percentage": 117.53
+        },
+        {
+          "type": "Comprar",
+          "datetime": "30/10/2023 09:15",
+          "units": 19.660724,
+          "opening_price": 1.9240,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 1.02,
+          "g_p": 51.29,
+          "g_p_percentage": 128.52
+        },
+        {
+          "type": "Comprar",
+          "datetime": "27/10/2023 11:23",
+          "units": 50.728125,
+          "opening_price": 1.9430,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 2.62,
+          "g_p": 131.21,
+          "g_p_percentage": 126.03
+        }
+      ]
+    },
+    {
+      "asset_name": "MBG.DE - Mercedes-Benz Group AG",
+      "current_price": 61.657,
+      "daily_change": 0.197,
+      "daily_change_percentage": 0.32,
+      "total_investment_units": 3.035718,
+      "average_cost_per_unit": 57.462,
+      "net_value": 210.10,
+      "total_profit_loss": 22.45,
+      "total_profit_loss_percentage": 11.96,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "20/12/2024 11:57",
+          "units": 1.00,
+          "opening_price": 53.130,
+          "stop_loss": 0.01,
+          "take_profit": 584.43,
+          "daily_p_l": 0.34,
+          "g_p": 17.28,
+          "g_p_percentage": 31.30
+        },
+        {
+          "type": "Comprar",
+          "datetime": "30/11/2023 16:06",
+          "units": 2.035718,
+          "opening_price": 59.590,
+          "stop_loss": 0.01,
+          "take_profit": null,
+          "daily_p_l": 0.69,
+          "g_p": 5.16,
+          "g_p_percentage": 3.90
+        }
+      ]
+    },
+    {
+      "asset_name": "PST.MI - Poste Italiane",
+      "current_price": 20.808,
+      "daily_change": 0.349,
+      "daily_change_percentage": 1.71,
+      "total_investment_units": 8.00,
+      "average_cost_per_unit": 12.265,
+      "net_value": 195.74,
+      "total_profit_loss": 89.22,
+      "total_profit_loss_percentage": 83.76,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "21/05/2024 15:14",
+          "units": 8.00,
+          "opening_price": 12.265,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 3.58,
+          "g_p": 89.22,
+          "g_p_percentage": 83.76
+        }
+      ]
+    },
+    {
+      "asset_name": "ML.PA - Compagnie Generale DES Etablissements Michelin SCA",
+      "current_price": 28.137,
+      "daily_change": 0.087,
+      "daily_change_percentage": 0.31,
+      "total_investment_units": 5.00,
+      "average_cost_per_unit": 32.142,
+      "net_value": 159.37,
+      "total_profit_loss": -17.23,
+      "total_profit_loss_percentage": -9.76,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "24/10/2024 09:57",
+          "units": 2.00,
+          "opening_price": 31.830,
+          "stop_loss": null,
+          "take_profit": 350.13,
+          "daily_p_l": 0.31,
+          "g_p": -2.54,
+          "g_p_percentage": -3.70
+        },
+        {
+          "type": "Comprar",
+          "datetime": "28/12/2023 09:00",
+          "units": 3.00,
+          "opening_price": 32.350,
+          "stop_loss": null,
+          "take_profit": 355.862,
+          "daily_p_l": 0.46,
+          "g_p": -14.69,
+          "g_p_percentage": -13.62
+        }
+      ]
+    },
+    {
+      "asset_name": "1810.HK - Xiaomi Corp",
+      "current_price": 41.89,
+      "daily_change": -1.07,
+      "daily_change_percentage": -2.49,
+      "total_investment_units": 29.00,
+      "average_cost_per_unit": 33.55,
+      "net_value": 156.37,
+      "total_profit_loss": 31.18,
+      "total_profit_loss_percentage": 24.91,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "07/01/2025 06:38",
+          "units": 29.00,
+          "opening_price": 33.55,
+          "stop_loss": null,
+          "take_profit": 369.03,
+          "daily_p_l": -3.73,
+          "g_p": 31.18,
+          "g_p_percentage": 24.91
+        }
+      ]
+    },
+    {
+      "asset_name": "T - AT&T Inc",
+      "current_price": 24.39,
+      "daily_change": -0.1867,
+      "daily_change_percentage": -0.76,
+      "total_investment_units": 6.00,
+      "average_cost_per_unit": 16.59,
+      "net_value": 146.58,
+      "total_profit_loss": 47.04,
+      "total_profit_loss_percentage": 47.26,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "27/12/2023 18:21",
+          "units": 6.00,
+          "opening_price": 16.59,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": -0.90,
+          "g_p": 47.04,
+          "g_p_percentage": 47.26
+        }
+      ]
+    },
+    {
+      "asset_name": "REP.MC - Repsol",
+      "current_price": 15.906,
+      "daily_change": 0.071,
+      "daily_change_percentage": 0.45,
+      "total_investment_units": 13.71,
+      "average_cost_per_unit": 11.892,
+      "net_value": 256.43,
+      "total_profit_loss": 81.46,
+      "total_profit_loss_percentage": 46.56,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "17/12/2024 10:57",
+          "units": 4.00,
+          "opening_price": 11.100,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.45,
+          "g_p": 28.27,
+          "g_p_percentage": 60.73
+        },
+        {
+          "type": "Comprar",
+          "datetime": "31/10/2024 14:12",
+          "units": 4.00,
+          "opening_price": 11.550,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.45,
+          "g_p": 24.56,
+          "g_p_percentage": 48.86
+        },
+        {
+          "type": "Comprar",
+          "datetime": "24/10/2024 10:00",
+          "units": 2.01,
+          "opening_price": 12.015,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.22,
+          "g_p": 11.52,
+          "g_p_percentage": 44.19
+        },
+        {
+          "type": "Comprar",
+          "datetime": "01/08/2024 17:09",
+          "units": 3.70,
+          "opening_price": 13.050,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.41,
+          "g_p": 17.11,
+          "g_p_percentage": 32.86
+        }
+      ]
+    },
+    {
+      "asset_name": "KO - Coca-Cola",
+      "current_price": 70.39,
+      "daily_change": -0.1258,
+      "daily_change_percentage": -0.18,
+      "total_investment_units": 1.933,
+      "average_cost_per_unit": 58.36,
+      "net_value": 136.28,
+      "total_profit_loss": 23.47,
+      "total_profit_loss_percentage": 20.80,
+      "positions": [
+        {
+          "type": "Comprar 24/5",
+          "datetime": "20/09/2023 15:30",
+          "units": 1.933,
+          "opening_price": 58.36,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": -0.04,
+          "g_p": 23.47,
+          "g_p_percentage": 20.80
+        }
+      ]
+    },
+    {
+      "asset_name": "SAN.MC - Banco Santander SA",
+      "current_price": 9.8172,
+      "daily_change": 0.1852,
+      "daily_change_percentage": 1.92,
+      "total_investment_units": 14.000511,
+      "average_cost_per_unit": 3.9129,
+      "net_value": 158.60,
+      "total_profit_loss": 99.77,
+      "total_profit_loss_percentage": 169.59,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "02/08/2024 10:45",
+          "units": 4.14,
+          "opening_price": 4.2075,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.97,
+          "g_p": 28.96,
+          "g_p_percentage": 153.81
+        },
+        {
+          "type": "Comprar",
+          "datetime": "24/05/2024 10:02",
+          "units": 1.959145,
+          "opening_price": 4.7160,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.46,
+          "g_p": 12.62,
+          "g_p_percentage": 126.16
+        },
+        {
+          "type": "Comprar",
+          "datetime": "15/09/2023 12:07",
+          "units": 7.901366,
+          "opening_price": 3.5595,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 1.86,
+          "g_p": 58.19,
+          "g_p_percentage": 193.97
+        }
+      ]
+    },
+    {
+      "asset_name": "JNJ - Johnson & Johnson",
+      "current_price": 211.78,
+      "daily_change": 0.2018,
+      "daily_change_percentage": 0.10,
+      "total_investment_units": 0.64683,
+      "average_cost_per_unit": 177.79,
+      "net_value": 137.19,
+      "total_profit_loss": 22.19,
+      "total_profit_loss_percentage": 19.30,
+      "positions": [
+        {
+          "type": "Comprar 24/5",
+          "datetime": "02/09/2025 18:12",
+          "units": 0.64683,
+          "opening_price": 177.79,
+          "stop_loss": null,
+          "take_profit": 1955.69,
+          "daily_p_l": 0.34,
+          "g_p": 22.19,
+          "g_p_percentage": 19.30
+        }
+      ]
+    },
+    {
+      "asset_name": "IBE.MC - Iberdrola",
+      "current_price": 17.973,
+      "daily_change": 0.093,
+      "daily_change_percentage": 0.52,
+      "total_investment_units": 4.996528,
+      "average_cost_per_unit": 10.978,
+      "net_value": 99.93,
+      "total_profit_loss": 41.19,
+      "total_profit_loss_percentage": 70.13,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "23/02/2024 16:56",
+          "units": 1.63,
+          "opening_price": 10.695,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.23,
+          "g_p": 13.98,
+          "g_p_percentage": 74.12
+        },
+        {
+          "type": "Comprar",
+          "datetime": "21/09/2023 10:56",
+          "units": 3.366528,
+          "opening_price": 11.115,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.47,
+          "g_p": 27.21,
+          "g_p_percentage": 68.24
+        }
+      ]
+    },
+    {
+      "asset_name": "BAYN.DE - Bayer AG",
+      "current_price": 36.370,
+      "daily_change": 0.02,
+      "daily_change_percentage": 0.06,
+      "total_investment_units": 2.00,
+      "average_cost_per_unit": 19.226,
+      "net_value": 85.53,
+      "total_profit_loss": 45.17,
+      "total_profit_loss_percentage": 111.93,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "04/12/2024 10:42",
+          "units": 2.00,
+          "opening_price": 19.226,
+          "stop_loss": null,
+          "take_profit": 211.486,
+          "daily_p_l": 0.18,
+          "g_p": 45.17,
+          "g_p_percentage": 111.93
+        }
+      ]
+    },
+    {
+      "asset_name": "VICI - VICI Properties Inc",
+      "current_price": 28.46,
+      "daily_change": -0.1928,
+      "daily_change_percentage": -0.67,
+      "total_investment_units": 3.78709,
+      "average_cost_per_unit": 27.57,
+      "net_value": 107.97,
+      "total_profit_loss": 3.56,
+      "total_profit_loss_percentage": 3.41,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "27/10/2023 17:23",
+          "units": 3.78709,
+          "opening_price": 27.57,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": -0.57,
+          "g_p": 3.56,
+          "g_p_percentage": 3.41
+        }
+      ]
+    },
+    {
+      "asset_name": "ULVR.L - Unilever",
+      "current_price": 4862.19,
+      "daily_change": 32.95,
+      "daily_change_percentage": 0.68,
+      "total_investment_units": 1.826412,
+      "average_cost_per_unit": 4403.25,
+      "net_value": 110.22,
+      "total_profit_loss": 11.39,
+      "total_profit_loss_percentage": 11.53,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "14/11/2023 12:40",
+          "units": 1.826412,
+          "opening_price": 4403.25,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.98,
+          "g_p": 11.39,
+          "g_p_percentage": 11.53
+        }
+      ]
+    },
+    {
+      "asset_name": "BTC - Bitcoin",
+      "current_price": 89877.70,
+      "daily_change": 1354.63,
+      "daily_change_percentage": 1.53,
+      "total_investment_units": "<0.01",
+      "average_cost_per_unit": 84234.49,
+      "net_value": 120.30,
+      "total_profit_loss": 7.56,
+      "total_profit_loss_percentage": 6.70,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "12/02/2025 10:14",
+          "units": "<0.01",
+          "opening_price": 97213.95,
+          "stop_loss": null,
+          "take_profit": 9817613.37,
+          "daily_p_l": 0.95,
+          "g_p": -5.14,
+          "g_p_percentage": -7.55
+        },
+        {
+          "type": "Comprar",
+          "datetime": "20/12/2024 12:01",
+          "units": "<0.01",
+          "opening_price": 95097.96,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.15,
+          "g_p": -0.60,
+          "g_p_percentage": -5.50
+        },
+        {
+          "type": "Comprar",
+          "datetime": "06/12/2024 10:14",
+          "units": "<0.01",
+          "opening_price": 99175.58,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.14,
+          "g_p": -0.94,
+          "g_p_percentage": -9.38
+        },
+        {
+          "type": "Comprar",
+          "datetime": "04/12/2024 10:40",
+          "units": "<0.01",
+          "opening_price": 98007.31,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.14,
+          "g_p": -0.83,
+          "g_p_percentage": -8.30
+        },
+        {
+          "type": "Comprar",
+          "datetime": "03/01/2024 14:55",
+          "units": "<0.01",
+          "opening_price": 42954.37,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.43,
+          "g_p": 15.06,
+          "g_p_percentage": 109.39
+        }
+      ]
+    },
+    {
+      "asset_name": "ITX.MC - Industria de Diseno Textil SA",
+      "current_price": 55.01,
+      "daily_change": -0.75,
+      "daily_change_percentage": -1.35,
+      "total_investment_units": 2.00,
+      "average_cost_per_unit": 49.24,
+      "net_value": 129.38,
+      "total_profit_loss": 27.00,
+      "total_profit_loss_percentage": 26.37,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "20/12/2024 09:22",
+          "units": 2.00,
+          "opening_price": 49.24,
+          "stop_loss": null,
+          "take_profit": 541.64,
+          "daily_p_l": -1.55,
+          "g_p": 27.00,
+          "g_p_percentage": 26.37
+        }
+      ]
+    },
+    {
+      "asset_name": "ENC.MC - Ence Energia Y Celulosa SA",
+      "current_price": 2.300,
+      "daily_change": -0.02,
+      "daily_change_percentage": -0.86,
+      "total_investment_units": 34.00,
+      "average_cost_per_unit": 2.855,
+      "net_value": 89.67,
+      "total_profit_loss": -19.06,
+      "total_profit_loss_percentage": -17.53,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "06/05/2025 09:00",
+          "units": 25.00,
+          "opening_price": 2.866,
+          "stop_loss": null,
+          "take_profit": 31.526,
+          "daily_p_l": -0.47,
+          "g_p": -13.57,
+          "g_p_percentage": -16.71
+        },
+        {
+          "type": "Comprar",
+          "datetime": "26/02/2024 09:00",
+          "units": 9.00,
+          "opening_price": 2.824,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": -0.17,
+          "g_p": -5.49,
+          "g_p_percentage": -19.96
+        }
+      ]
+    },
+    {
+      "asset_name": "NESN.ZU - Nestle SA",
+      "current_price": 78.64,
+      "daily_change": 0.69,
+      "daily_change_percentage": 0.89,
+      "total_investment_units": 1.00,
+      "average_cost_per_unit": 89.10,
+      "net_value": 98.95,
+      "total_profit_loss": -3.26,
+      "total_profit_loss_percentage": -3.19,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "02/08/2024 09:01",
+          "units": 1.00,
+          "opening_price": 89.10,
+          "stop_loss": null,
+          "take_profit": 980.11,
+          "daily_p_l": 1.02,
+          "g_p": -3.26,
+          "g_p_percentage": -3.19
+        }
+      ]
+    },
+    {
+      "asset_name": "NKE - NIKE",
+      "current_price": 67.90,
+      "daily_change": 0.4379,
+      "daily_change_percentage": 0.65,
+      "total_investment_units": 1.10954,
+      "average_cost_per_unit": 71.48,
+      "net_value": 75.46,
+      "total_profit_loss": -3.85,
+      "total_profit_loss_percentage": -4.85,
+      "positions": [
+        {
+          "type": "Comprar 24/5",
+          "datetime": "30/06/2025 15:31",
+          "units": 1.10954,
+          "opening_price": 71.48,
+          "stop_loss": null,
+          "take_profit": 786.28,
+          "daily_p_l": 0.60,
+          "g_p": -3.85,
+          "g_p_percentage": -4.85
+        }
+      ]
+    },
+    {
+      "asset_name": "Grab Holdings Ltd (GRAB)",
+      "current_price": 5.15,
+      "daily_change": -0.03,
+      "daily_change_percentage": -0.58,
+      "total_investment_units": 14.00,
+      "average_cost_per_unit": 4.11,
+      "net_value": 72.24,
+      "total_profit_loss": 14.70,
+      "total_profit_loss_percentage": 25.55,
+      "positions": [
+        {
+          "type": "Comprar",
+          "datetime": "04/11/2024 17:36",
+          "units": 14.00,
+          "opening_price": 4.11,
+          "stop_loss": null,
+          "take_profit": null,
+          "daily_p_l": 0.00,
+          "g_p": 14.70,
+          "g_p_percentage": 25.55
+        }
+      ]
+    },
+    {
+      "asset_name": "MICC.L - MAGNUM ICE CREAM CO BV",
+      "current_price": 1257.31,
+      "daily_change": 89.07,
+      "daily_change_percentage": 7.62,
+      "total_investment_units": 0.410942,
+      "average_cost_per_unit": 0.00,
+      "net_value": 6.92,
+      "total_profit_loss": 6.92,
+      "total_profit_loss_percentage": 0.00,
+      "positions": [
+        {
+          "type": "Comprar DIV",
+          "datetime": "09/12/2025 11:21",
+          "units": 0.410942,
+          "opening_price": 0.00,
+          "stop_loss": null,
+          "take_profit": 0.50,
+          "daily_p_l": 6.92,
+          "g_p": 6.92,
+          "g_p_percentage": 0.00
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
 import { randomUUID } from 'crypto';
@@ -24,6 +24,7 @@ interface EtoroTransaction {
     taxRate?: number; // %
     isin?: string;
     assetCurrency?: string;
+    fee?: number;
 }
 
 // --- Helpers ---
@@ -242,8 +243,28 @@ activityData.forEach((row: any) => {
             originalId: id,
             details: details
         });
+    } else if (type === 'Rollover Fee' || type === 'SDRT' || details.includes('SDRT') || details.includes('Stamp Duty')) {
+        // Handle Fees (SDRT, Rollover)
+        // Treated as Cost Increase (BUY with 0 qty)
+        const { symbol, currency: assetCurrency } = parseAssetDetails(details);
+        transactions.push({
+            id: randomUUID(),
+            date,
+            type: 'BUY',
+            amount: amount, // Fee amount is usually negative in export? No, "Importe" is usually -0.10 for fees.
+            // But for "BUY" in our system, amount is Cost.
+            // If eToro export shows negative for fee (cash outflow), we take absolute value.
+            currency: 'USD',
+            assetSymbol: symbol,
+            quantity: 0,
+            pricePerUnit: 0,
+            originalId: id,
+            details: details,
+            fee: Math.abs(amount) // Explicitly track as fee
+            // Using logic: if quantity 0, amount is added to cost.
+            // If I set amount = Math.abs(amount), it fits.
+        });
     }
-    // Ignore 'Ganancias/pérdidas...' here, handled by Closed Positions
 });
 
 // 2. Process "Posiciones cerradas" for SELLs
@@ -287,7 +308,52 @@ closedData.forEach((row: any) => {
 // The sample log for Actividad didn't show a Dividendo row with values.
 // Let's rely on Actividad for now as primary timeline.
 
-// 4. Sort
+// --- MERGE FEES STEP ---
+// Group by OriginalID to merge separate Fee transactions (like SDRT) into the main BUY/SELL
+console.log('Merging Fees into associated transactions...');
+const mergedTransactions: EtoroTransaction[] = [];
+const byOriginalId = new Map<string, EtoroTransaction[]>();
+
+for (const t of transactions) {
+    if (!t.originalId || t.originalId === '-' || t.originalId === '0') {
+        mergedTransactions.push(t);
+        continue;
+    }
+    const list = byOriginalId.get(t.originalId) || [];
+    list.push(t);
+    byOriginalId.set(t.originalId, list);
+}
+
+for (const [origId, group] of byOriginalId) {
+    // Find main asset transaction (BUY with Quantity > 0)
+    // Note: SDRT usually linked to BUY.
+    const mainTx = group.find(t => t.type === 'BUY' && t.quantity > 0);
+
+    if (mainTx) {
+        // Find fee transactions (BUY 0 qty, with fee)
+        const fees = group.filter(t => t !== mainTx && t.type === 'BUY' && t.quantity === 0 && (t.fee || 0) > 0);
+
+        fees.forEach(feeTx => {
+            mainTx.fee = (mainTx.fee || 0) + (feeTx.fee || 0);
+            // Optional: Append to details?
+            // mainTx.details += ` | Fee: ${feeTx.details}`;
+        });
+
+        // Add mainTx
+        mergedTransactions.push(mainTx);
+
+        // Add others (e.g. non-fee duplicates? or other types if ever they share ID)
+        const others = group.filter(t => t !== mainTx && !fees.includes(t));
+        mergedTransactions.push(...others);
+    } else {
+        // No main transaction, keep all
+        mergedTransactions.push(...group);
+    }
+}
+
+// Replace and Sort
+transactions.length = 0;
+transactions.push(...mergedTransactions);
 transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
 // 5. Output
@@ -308,7 +374,7 @@ const prisma = new PrismaClient();
 
 async function importToDb() {
     // HARDCODED Portfolio ID for 'eToro' found in previous step
-    const PORTFOLIO_ID = '13959c6a-523a-4470-8b96-fede81606269';
+    const PORTFOLIO_ID = 'd26e2ad7-0eee-4b3b-a269-fbee94c020d9';
 
     console.log(`Starting import to Portfolio ID: ${PORTFOLIO_ID}`);
 

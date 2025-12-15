@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts";
 
 type ChartData = {
     date: string;
@@ -130,14 +130,11 @@ export function PortfolioChart({ data }: { data: ChartData }) {
                             dot={false}
                             name="Current Value"
                         />
-                        <Line
-                            type="monotone"
-                            dataKey="invested"
+                        <ReferenceLine
+                            y={filteredData.length > 0 ? filteredData[0].value : 0}
                             stroke="#888888"
-                            strokeWidth={2}
                             strokeDasharray="5 5"
-                            dot={false}
-                            name="Invested"
+                            strokeWidth={2}
                         />
                     </LineChart>
                 </ResponsiveContainer>
