@@ -13,6 +13,7 @@ import { AssetBreakdownTable } from "@/components/asset-breakdown-table";
 import { PortfolioAllocationModal } from "@/components/portfolio-allocation-modal";
 import { ImportTransactionsDialog } from "@/components/import-transactions-dialog";
 import { ImportAdjustmentsDialog } from "@/components/import-adjustments-dialog";
+import { ImportTradeRepublicDialog } from "@/components/import-trade-republic-dialog";
 import { DeleteAllTransactionsButton } from "@/components/delete-all-transactions-button";
 
 // ... (previous imports)
@@ -66,6 +67,7 @@ export default async function PortfolioPage({
                     <div className="flex gap-2">
                         <RefreshPricesButton portfolioId={portfolio.id} />
                         <ImportTransactionsDialog portfolioId={portfolio.id} />
+                        <ImportTradeRepublicDialog portfolioId={portfolio.id} />
                         <ImportAdjustmentsDialog portfolioId={portfolio.id} />
                         <DeleteAllTransactionsButton portfolioId={portfolio.id} />
                         <CreateTransactionDialog portfolioId={portfolio.id} currency={portfolio.currency} />

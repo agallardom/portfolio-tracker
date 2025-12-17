@@ -10,24 +10,49 @@ const yahooFinance = new YahooFinance();
 export async function updatePortfolioPrices(portfolioId: string) {
     try {
         console.log(`[Price Update] Starting update for portfolio: ${portfolioId}`);
-        // 1. Get all unique assets in the portfolio
+        // 1. Get all transactions to calculate holdings
         const transactions = await prisma.transaction.findMany({
             where: {
                 portfolioId,
                 assetSymbol: { not: null }
             },
-            select: { assetSymbol: true },
-            distinct: ['assetSymbol']
+            select: {
+                assetSymbol: true,
+                type: true,
+                quantity: true
+            }
         });
 
-        const symbols = transactions
-            .map(t => t.assetSymbol)
-            .filter((s): s is string => s !== null);
+        // Calculate net quantity per asset
+        const holdings = new Map<string, number>();
 
-        console.log(`[Price Update] Found symbols to update:`, symbols);
+        for (const tx of transactions) {
+            if (!tx.assetSymbol) continue;
+
+            const currentQty = holdings.get(tx.assetSymbol) || 0;
+            const qty = tx.quantity || 0;
+
+            // Add quantity for BUY, SAVEBACK, ROUNDUP (assuming these add assets)
+            if (tx.type === 'BUY' || tx.type === 'SAVEBACK' || tx.type === 'ROUNDUP') {
+                holdings.set(tx.assetSymbol, currentQty + qty);
+            }
+            // Subtract quantity for SELL
+            else if (tx.type === 'SELL') {
+                holdings.set(tx.assetSymbol, currentQty - qty);
+            }
+            // DEPOSIT/WITHDRAWAL usually don't have assetSymbol, but if they do and affect qty, handle here?
+            // Based on other files, they are cash ops.
+            // DIVIDEND is cash only.
+        }
+
+        const symbols = Array.from(holdings.entries())
+            .filter(([_, qty]) => qty > 0.000001) // Filter out 0 or near-0 quantities
+            .map(([symbol]) => symbol);
+
+        console.log(`[Price Update] Found active symbols to update:`, symbols);
 
         if (symbols.length === 0) {
-            return { success: true, message: "No assets to update" };
+            return { success: true, message: "No active assets to update" };
         }
 
         // 2. Fetch prices
@@ -174,8 +199,14 @@ export async function getHistoricalPrices(
         });
 
         return priceMap;
-    } catch (error) {
-        console.error(`Failed to fetch historical prices for ${symbol}:`, error);
+
+    } catch (error: any) {
+        if (error.message && (error.message.includes('No data found') || error.message.includes('delisted'))) {
+            // Expected error for some eToro synthetic assets or old symbols
+            console.warn(`[Historical] Skipped delisted/invalid symbol: ${symbol}`);
+        } else {
+            console.error(`Failed to fetch historical prices for ${symbol}:`, error);
+        }
         return new Map();
     }
 }

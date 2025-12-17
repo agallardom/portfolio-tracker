@@ -227,12 +227,15 @@ export async function getPortfolioSummary(portfolioId: string) {
         // Calculate Value in EUR for display
         const portfolioToEURRate = await getExchangeRate(portfolio.currency, "EUR");
         const currentValueEUR = currentValue * portfolioToEURRate;
+        const realizedGainsEUR = realizedGains * portfolioToEURRate;
+        const totalInvestedConvertedEUR = explicitInvested * portfolioToEURRate;
 
         return {
             success: true,
             data: {
                 totalInvested: explicitInvested,
-                totalInvestedEUR,
+                totalInvestedEUR, // This was tracking specific EUR deposits, but effectively we want total invested value in EUR
+                totalInvestedConvertedEUR, // Total invested amount converted to EUR at current rate
                 totalInvestedUSD,
                 cashBalance,
                 assetsValue,
@@ -240,13 +243,100 @@ export async function getPortfolioSummary(portfolioId: string) {
                 currentValueEUR,
                 totalGain,
                 totalGainPercent,
-                currency: portfolio.currency
+                realizedGains,
+                realizedGainsEUR,
+                currency: portfolio.currency,
+                transactionCount: transactions.length
             }
         };
 
     } catch (error) {
         console.error("Error calculating summary:", error);
         return { success: false, error: "Failed to calculate summary" };
+    }
+}
+
+export async function getDashboardSummary() {
+    try {
+        const portfoliosRes = await getPortfolios();
+        if (!portfoliosRes.success || !portfoliosRes.data) {
+            return {
+                success: false,
+                data: {
+                    totalBalanceEUR: 0,
+                    totalInvestedEUR: 0,
+                    totalRealizedPLEUR: 0,
+                    totalGainEUR: 0,
+                    totalGainPercent: 0,
+                    portfolios: []
+                }
+            };
+        }
+
+        const summaries = await Promise.all(
+            portfoliosRes.data.map(p => getPortfolioSummary(p.id))
+        );
+
+        let totalBalanceEUR = 0;
+        let totalInvestedEUR = 0;
+        let totalRealizedPLEUR = 0;
+        // let totalGainEUR = 0;
+        const detailedPortfolios = [];
+
+        for (let i = 0; i < summaries.length; i++) {
+            const res = summaries[i];
+            const portfolio = portfoliosRes.data[i];
+
+            if (res.success && res.data) {
+                totalBalanceEUR += res.data.currentValueEUR || 0;
+
+                // Prioritize explicit EUR investment (historical cost) if available
+                if ((res.data.totalInvestedEUR || 0) > 0) {
+                    totalInvestedEUR += res.data.totalInvestedEUR || 0;
+                } else {
+                    // Fallback to converted value
+                    totalInvestedEUR += res.data.totalInvestedConvertedEUR || 0;
+                }
+
+                totalRealizedPLEUR += res.data.realizedGainsEUR || 0;
+
+                detailedPortfolios.push({
+                    id: portfolio.id,
+                    name: portfolio.name,
+                    currency: portfolio.currency,
+                    currentValue: res.data.currentValue,
+                    transactionCount: res.data.transactionCount || 0
+                });
+            } else {
+                // Push basic info if summary failed
+                detailedPortfolios.push({
+                    id: portfolio.id,
+                    name: portfolio.name,
+                    currency: portfolio.currency,
+                    currentValue: 0,
+                    transactionCount: 0
+                });
+            }
+        }
+
+        const totalGainEUR = totalBalanceEUR - totalInvestedEUR;
+        const totalGainPercent = totalInvestedEUR > 0 ? (totalGainEUR / totalInvestedEUR) * 100 : 0;
+
+        return {
+            success: true,
+            data: {
+                totalBalanceEUR,
+                totalInvestedEUR,
+                totalRealizedPLEUR,
+                totalGainEUR,
+                totalGainPercent,
+                portfolios: detailedPortfolios
+            }
+        };
+
+    } catch (error) {
+        console.error("Error calculating dashboard summary:", error);
+        return { success: false, error: "Failed to calculate dashboard summary" };
     }
 }
 

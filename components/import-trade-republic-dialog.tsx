@@ -2,15 +2,15 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { createPortal } from "react-dom";
-import { Upload, Loader2, FileJson } from 'lucide-react';
-import { applyAdjustments } from '@/actions/adjustments';
+import { Upload, Loader2, FileText } from 'lucide-react';
+import { importTradeRepublicPDF } from '@/actions/import-trade-republic';
 import { useRouter } from 'next/navigation';
 
-interface ImportAdjustmentsDialogProps {
+interface ImportTradeRepublicDialogProps {
     portfolioId: string;
 }
 
-export function ImportAdjustmentsDialog({ portfolioId }: ImportAdjustmentsDialogProps) {
+export function ImportTradeRepublicDialog({ portfolioId }: ImportTradeRepublicDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -31,46 +31,36 @@ export function ImportAdjustmentsDialog({ portfolioId }: ImportAdjustmentsDialog
         const file = formData.get('file') as File;
 
         if (!file || file.size === 0) {
-            setError('Please select a valid JSON file.');
+            setError('Please select a valid PDF file.');
             return;
         }
 
-        const text = await file.text();
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            setError('Only PDF files are supported.');
+            return;
+        }
 
         startTransition(async () => {
-            const result = await applyAdjustments(portfolioId, text);
+            const result = await importTradeRepublicPDF(portfolioId, formData);
             if (result.success) {
-                // Construct detailed success message
-                const details = result.results;
-                const msg = `Updated: ${details?.updated.length}, Unchanged: ${details?.unchanged.length}, Not Found: ${details?.notFound.length}`;
-
-                setSuccess(msg);
-
-                // If there are failures, show them but keep dialog open longer or until manual close?
-                // For now, auto-close after delay unless there are issues?
-                // Let's not auto-close if there are "Not Found" items so user can see.
-
-                if (details?.notFound && details.notFound.length > 0) {
-                    // Keep open
-                } else {
-                    setTimeout(() => {
-                        setIsOpen(false);
-                        setSuccess(null);
-                        router.refresh();
-                    }, 2000);
-                }
+                setSuccess(`Successfully imported ${result.count} transactions.`);
+                setTimeout(() => {
+                    setIsOpen(false);
+                    setSuccess(null);
+                    router.refresh();
+                }, 2000);
             } else {
-                setError(result.error || 'Failed to apply adjustments.');
+                setError(result.error || 'Failed to import transactions.');
             }
         });
     }
 
     const modalContent = (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsOpen(false)}>
-            <div className="bg-card border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <h2 className="text-xl font-bold mb-2">Import Adjustments</h2>
+            <div className="bg-card border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h2 className="text-xl font-bold mb-2">Import Trade Republic</h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                    Upload your eToro adjustments JSON file ("eToro_ajustes.json"). This will update asset prices and exchange rates.
+                    Upload your Trade Republic PDF statement ("Trade Republic 2025.pdf"). This will parse Savings Plans and Dividends.
                 </p>
 
                 <form onSubmit={onSubmit} className="space-y-4">
@@ -79,7 +69,7 @@ export function ImportAdjustmentsDialog({ portfolioId }: ImportAdjustmentsDialog
                             id="file"
                             name="file"
                             type="file"
-                            accept=".json"
+                            accept=".pdf"
                             disabled={isPending}
                             className="w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80 cursor-pointer border border-white/10 rounded-lg p-2 bg-secondary/20"
                         />
@@ -92,23 +82,8 @@ export function ImportAdjustmentsDialog({ portfolioId }: ImportAdjustmentsDialog
                     )}
 
                     {success && (
-                        <div className="text-sm space-y-2">
-                            <div className="text-green-400 bg-green-500/10 p-3 rounded-lg border border-green-500/20">
-                                {success}
-                            </div>
-                            {/* Show Not Found List if any */}
-                            {success.includes("Not Found") && !success.endsWith("Not Found: 0") && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-xs text-yellow-200/80">
-                                    <p className="font-semibold mb-1">Assets Not Found:</p>
-                                    <ul className="list-disc pl-4 space-y-1">
-                                        {/* We need to store raw results in state to map here properly. 
-                                            But since we only set string success, we can't easily access the array. 
-                                            Fix: Store full result in state.
-                                        */}
-                                        <p className="italic opacity-70">Check console or upload again (List truncated in simple view)</p>
-                                    </ul>
-                                </div>
-                            )}
+                        <div className="text-sm text-green-400 bg-green-500/10 p-3 rounded-lg border border-green-500/20">
+                            {success}
                         </div>
                     )}
 
@@ -150,8 +125,8 @@ export function ImportAdjustmentsDialog({ portfolioId }: ImportAdjustmentsDialog
                 onClick={() => setIsOpen(true)}
                 className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors flex items-center gap-2"
             >
-                <FileJson className="w-4 h-4" />
-                Import Adjustments
+                <FileText className="w-4 h-4" />
+                Import TR
             </button>
             {isOpen && mounted && createPortal(modalContent, document.body)}
         </>

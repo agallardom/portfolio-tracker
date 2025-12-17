@@ -24,6 +24,7 @@ model Portfolio {
 
 model Asset {
   symbol            String        @id
+  isin              String?       @unique // Trade Republic Import support
   name              String?
   assetClass        String?       @default("EQUITY") // "EQUITY", "FIXED_INCOME", "CASH", "CRYPTO"
   currentPrice      Float?        // Price in quote currency

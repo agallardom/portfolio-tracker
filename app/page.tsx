@@ -1,5 +1,5 @@
 import { Navigation } from "@/components/nav";
-import { getPortfolios } from "@/actions/portfolio";
+import { getPortfolios, getDashboardSummary } from "@/actions/portfolio";
 import Link from "next/link";
 import { CreatePortfolioDialog } from "@/components/create-portfolio-dialog";
 import { db } from "@/lib/db"
@@ -30,6 +30,12 @@ export default async function Home() {
   }
 
   const { data: portfolios } = await getPortfolios();
+  const { data: summary } = await getDashboardSummary();
+
+  const totalBalance = summary?.totalBalanceEUR || 0;
+  const totalInvested = summary?.totalInvestedEUR || 0;
+  const realizedPL = summary?.totalRealizedPLEUR || 0;
+  const totalGainPercent = summary?.totalGainPercent || 0;
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -52,25 +58,38 @@ export default async function Home() {
         </header>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Balance (Est. EUR)</h3>
-            <p className="text-3xl font-bold">€0.00</p>
-            <div className="mt-4 flex items-center text-sm text-green-400">
-              <span>+0.00%</span>
-              <span className="ml-2 text-muted-foreground">all time</span>
-            </div>
+            <p className="text-3xl font-bold">
+              {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(totalBalance)}
+            </p>
           </div>
 
           <div className="glass-card p-6 rounded-2xl">
             <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Invested</h3>
-            <p className="text-3xl font-bold">€0.00</p>
+            <p className="text-3xl font-bold">
+              {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(totalInvested)}
+            </p>
+          </div>
+
+          <div className="glass-card p-6 rounded-2xl">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Gain</h3>
+            <p className={`text-3xl font-bold ${summary?.totalGainEUR != undefined && summary.totalGainEUR >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {summary?.totalGainEUR != undefined && summary.totalGainEUR >= 0 ? '+' : ''}
+              {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(summary?.totalGainEUR || 0)}
+            </p>
+            <div className={`mt-4 flex items-center text-sm ${totalGainPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <span>{totalGainPercent >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}% ROI</span>
+            </div>
           </div>
 
           <div className="glass-card p-6 rounded-2xl">
             <h3 className="text-sm font-medium text-muted-foreground mb-2">Realized P/L</h3>
-            <p className="text-3xl font-bold text-gray-400">€0.00</p>
+            <p className={`text-3xl font-bold ${realizedPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(realizedPL)}
+            </p>
           </div>
         </div>
 
@@ -83,7 +102,7 @@ export default async function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {portfolios?.map((portfolio: { id: string, name: string, currency: string }) => (
+            {summary?.portfolios?.map((portfolio: { id: string, name: string, currency: string, currentValue: number, transactionCount: number }) => (
               <Link href={`/portfolio/${portfolio.id}`} key={portfolio.id} className="glass-card p-6 rounded-2xl hover:border-primary/50 transition-colors cursor-pointer block">
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -96,8 +115,10 @@ export default async function Home() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">0.00 {portfolio.currency}</p>
-                  <p className="text-sm text-muted-foreground mt-1">0 transactions</p>
+                  <p className="text-2xl font-bold">
+                    {new Intl.NumberFormat('en-IE', { style: 'currency', currency: portfolio.currency }).format(portfolio.currentValue)}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">{portfolio.transactionCount} transactions</p>
                 </div>
               </Link>
             ))}
