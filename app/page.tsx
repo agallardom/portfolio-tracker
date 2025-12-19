@@ -8,6 +8,10 @@ import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
+import { AiPromptDialog } from "@/components/ai-prompt-dialog";
+
+import { Upload } from "lucide-react";
+
 export default async function Home() {
   const session = await auth()
 
@@ -49,9 +53,21 @@ export default async function Home() {
 
       <main className="container mx-auto px-6 py-8">
         <header className="mb-12">
-          <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-            Dashboard
-          </h1>
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+              Dashboard
+            </h1>
+            <div className="flex gap-3">
+              <AiPromptDialog />
+              <Link
+                href="/import"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium"
+              >
+                <Upload className="w-4 h-4" />
+                Import
+              </Link>
+            </div>
+          </div>
           <p className="text-muted-foreground">
             Overview of your investments across {portfolios?.length || 0} portfolios.
           </p>

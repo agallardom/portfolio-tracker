@@ -6,7 +6,14 @@ import { calculateRiskScore, determineRiskProfile } from "@/lib/risk-engine"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-export async function saveRiskProfile(answers: Record<string, number>) {
+export async function saveRiskProfile(
+    answers: Record<string, number>,
+    context?: {
+        horizon: string,
+        goal: string,
+        restrictions: string
+    }
+) {
     const session = await auth()
     if (!session || !session.user.id) {
         return { success: false, message: "Unauthorized" }
@@ -23,11 +30,19 @@ export async function saveRiskProfile(answers: Record<string, number>) {
                 score,
                 profile,
                 answers: JSON.stringify(answers),
+                // New Fields
+                investmentHorizon: context?.horizon || null,
+                investmentGoal: context?.goal || null,
+                restrictions: context?.restrictions || null,
             },
             update: {
                 score,
                 profile,
                 answers: JSON.stringify(answers),
+                // New Fields
+                investmentHorizon: context?.horizon || null,
+                investmentGoal: context?.goal || null,
+                restrictions: context?.restrictions || null,
             }
         })
     } catch (error) {

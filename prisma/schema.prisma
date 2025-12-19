@@ -110,6 +110,11 @@ model RiskProfile {
   // Let's store the breakdown.
   answers     String   // JSON string of answers e.g. { "q1": 5, "q2": 3 ... }
   
+  // User Context for AI Prompt
+  investmentHorizon String?  // "Short", "Medium", "Long"
+  investmentGoal    String?  // "Growth", "Dividend", "Savings"
+  restrictions      String?  // Free text
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
